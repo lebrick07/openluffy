@@ -63,11 +63,18 @@ body {
   color: #9ca3af;
   text-decoration: none;
   font-weight: 500;
-  transition: color 0.2s;
+  transition: all 0.2s;
+  padding-bottom: 0.25rem;
+  border-bottom: 2px solid transparent;
 }
 
 .nav a:hover {
   color: #3b82f6;
+}
+
+.nav a.active {
+  color: #60a5fa;
+  border-bottom-color: #60a5fa;
 }
 
 /* Hero Section */

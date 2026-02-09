@@ -3,6 +3,7 @@ import './App.css'
 import DeployModal from './components/DeployModal'
 import ActionModal from './components/ActionModal'
 import Toast from './components/Toast'
+import IntegrationsDashboard from './components/IntegrationsDashboard'
 
 function App() {
   const [deployments, setDeployments] = useState([
@@ -32,6 +33,7 @@ function App() {
   const [selectedAction, setSelectedAction] = useState(null)
   const [toast, setToast] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [currentView, setCurrentView] = useState('deployments') // 'deployments' or 'integrations'
 
   useEffect(() => {
     // Test API connectivity
@@ -150,7 +152,20 @@ function App() {
           <h1>LeBrickBot</h1>
         </div>
         <nav className="nav">
-          <a href="#deployments">Deployments</a>
+          <a 
+            href="#deployments" 
+            className={currentView === 'deployments' ? 'active' : ''}
+            onClick={(e) => { e.preventDefault(); setCurrentView('deployments'); }}
+          >
+            Deployments
+          </a>
+          <a 
+            href="#integrations" 
+            className={currentView === 'integrations' ? 'active' : ''}
+            onClick={(e) => { e.preventDefault(); setCurrentView('integrations'); }}
+          >
+            Integrations
+          </a>
           <a href="#monitoring">Monitoring</a>
           <a href="#costs">Costs</a>
           <a href="#settings">Settings</a>
@@ -202,58 +217,62 @@ function App() {
       </section>
 
       {/* Main Content */}
-      <div className="content">
-        {/* Deployments */}
-        <section className="section deployments-section">
-          <h3>Active Deployments</h3>
-          <div className="deployments-list">
-            {deployments.map(dep => (
-              <div key={dep.id} className="deployment-card">
-                <div className="deployment-header">
-                  <span className="deployment-name">{dep.name}</span>
-                  <span className={`deployment-status status-${dep.status}`}>{dep.status}</span>
+      {currentView === 'deployments' ? (
+        <div className="content">
+          {/* Deployments */}
+          <section className="section deployments-section">
+            <h3>Active Deployments</h3>
+            <div className="deployments-list">
+              {deployments.map(dep => (
+                <div key={dep.id} className="deployment-card">
+                  <div className="deployment-header">
+                    <span className="deployment-name">{dep.name}</span>
+                    <span className={`deployment-status status-${dep.status}`}>{dep.status}</span>
+                  </div>
+                  <div className="deployment-meta">
+                    <span className="deployment-time">⏱ {dep.time}</span>
+                    <span className="deployment-replicas">📦 {dep.replicas} replica{dep.replicas > 1 ? 's' : ''}</span>
+                    <span className="deployment-cost">💰 {dep.cost}</span>
+                  </div>
+                  <div className="deployment-actions">
+                    <button className="action-btn action-scale" onClick={() => handleAction(dep, 'scale')} title="Scale Up">
+                      ⬆️
+                    </button>
+                    <button className="action-btn action-restart" onClick={() => handleAction(dep, 'restart')} title="Restart">
+                      🔄
+                    </button>
+                    <button className="action-btn action-logs" onClick={() => handleAction(dep, 'logs')} title="View Logs">
+                      📋
+                    </button>
+                    <button className="action-btn action-delete" onClick={() => handleAction(dep, 'delete')} title="Delete">
+                      🗑️
+                    </button>
+                  </div>
                 </div>
-                <div className="deployment-meta">
-                  <span className="deployment-time">⏱ {dep.time}</span>
-                  <span className="deployment-replicas">📦 {dep.replicas} replica{dep.replicas > 1 ? 's' : ''}</span>
-                  <span className="deployment-cost">💰 {dep.cost}</span>
-                </div>
-                <div className="deployment-actions">
-                  <button className="action-btn action-scale" onClick={() => handleAction(dep, 'scale')} title="Scale Up">
-                    ⬆️
-                  </button>
-                  <button className="action-btn action-restart" onClick={() => handleAction(dep, 'restart')} title="Restart">
-                    🔄
-                  </button>
-                  <button className="action-btn action-logs" onClick={() => handleAction(dep, 'logs')} title="View Logs">
-                    📋
-                  </button>
-                  <button className="action-btn action-delete" onClick={() => handleAction(dep, 'delete')} title="Delete">
-                    🗑️
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-          <button className="btn-primary" onClick={() => setShowDeployModal(true)}>
-            🚀 Deploy New Service
-          </button>
-        </section>
+              ))}
+            </div>
+            <button className="btn-primary" onClick={() => setShowDeployModal(true)}>
+              🚀 Deploy New Service
+            </button>
+          </section>
 
-        {/* Activity Logs */}
-        <section className="section logs-section">
-          <h3>Activity Logs</h3>
-          <div className="logs-list">
-            {logs.map((log, idx) => (
-              <div key={idx} className={`log-entry log-${log.level}`}>
-                <span className="log-time">{log.time}</span>
-                <span className="log-level">[{log.level.toUpperCase()}]</span>
-                <span className="log-message">{log.message}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
+          {/* Activity Logs */}
+          <section className="section logs-section">
+            <h3>Activity Logs</h3>
+            <div className="logs-list">
+              {logs.map((log, idx) => (
+                <div key={idx} className={`log-entry log-${log.level}`}>
+                  <span className="log-time">{log.time}</span>
+                  <span className="log-level">[{log.level.toUpperCase()}]</span>
+                  <span className="log-message">{log.message}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      ) : (
+        <IntegrationsDashboard />
+      )}
 
       {/* Footer */}
       <footer className="footer">
