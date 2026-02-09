@@ -1,9 +1,6 @@
 from fastapi import FastAPI
-from openclaw.ci.github_actions import generate_github_actions
-from openclaw.api import router as openclaw_router
 
 app = FastAPI(title="lebrickbot")
-from openclaw.ci.github_actions import generate_github_actions
 
 @app.get("/healthz")
 def healthz():
@@ -11,11 +8,12 @@ def healthz():
 
 @app.get("/")
 def root():
-    return {"service": "lebrickbot", "status": "running"}
+    return {"service": "lebrickbot", "status": "running", "version": "0.1.0"}
 
-# OpenClaw runtime API
-app.include_router(openclaw_router)
-
-@app.post("/openclaw/ci/github-actions")
-def github_actions(payload: dict):
-    return generate_github_actions(payload)
+@app.get("/api/status")
+def api_status():
+    return {
+        "service": "lebrickbot-backend",
+        "status": "operational",
+        "version": "0.1.0"
+    }

@@ -6,19 +6,14 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ .Release.Name }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-{{ .Release.Name }}-strip-api@kubernetescrd
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   rules:
     - host: {{ .Values.ingress.host }}
       http:
         paths:
-          - path: {{ .Values.ingress.path }}
-            pathType: {{ .Values.ingress.pathType }}
-            backend:
-              service:
-                name: {{ .Release.Name }}-frontend
-                port:
-                  number: {{ .Values.frontend.service.port }}
           - path: /api
             pathType: Prefix
             backend:
@@ -26,4 +21,11 @@ spec:
                 name: {{ .Release.Name }}-backend
                 port:
                   number: {{ .Values.backend.service.port }}
+          - path: {{ .Values.ingress.path }}
+            pathType: {{ .Values.ingress.pathType }}
+            backend:
+              service:
+                name: {{ .Release.Name }}-frontend
+                port:
+                  number: {{ .Values.frontend.service.port }}
 {{- end }}
