@@ -78,7 +78,9 @@ When ready for production:
 
 ## CI/CD Pipeline
 
-Every push triggers:
+### CI Pipeline (Pull Requests)
+
+Runs when you create a PR:
 
 1. **Security Scan**
    - GitLeaks (secrets detection)
@@ -88,13 +90,30 @@ Every push triggers:
    - Backend: Ruff (linter), Black (formatter), pytest
    - Frontend: ESLint, unit tests
 
-3. **Build & Push**
-   - Docker images built
-   - Pushed to `ghcr.io/lebrick07/openluffy-*`
+3. **Build Validation**
+   - Docker images built (not pushed)
+   - Validates Dockerfiles work
 
-4. **Update Manifests** (main only)
-   - Helm values updated with new image tags
-   - ArgoCD auto-syncs deployment
+**PR must pass all checks before merge is allowed.**
+
+### Release Pipeline (Merge to Main)
+
+Runs automatically after merge to `main`:
+
+1. **Build & Push Images**
+   - Backend image → `ghcr.io/lebrick07/openluffy-backend:main-<sha>`
+   - Frontend image → `ghcr.io/lebrick07/openluffy-frontend:main-<sha>`
+
+2. **Update Manifests**
+   - Helm values.yaml updated with new image tags
+   - Committed back to main with `[skip ci]`
+
+3. **ArgoCD Deployment**
+   - ArgoCD detects manifest changes
+   - Auto-syncs to K8s cluster
+   - New pods deployed automatically
+
+**From code commit → production deployment: ~3-5 minutes**
 
 ## Local Development
 

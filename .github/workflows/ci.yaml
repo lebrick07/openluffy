@@ -1,9 +1,8 @@
-name: CI/CD Pipeline
+name: CI Pipeline
 
+# Runs ONLY on pull requests - validates code quality, security, builds
 on:
   pull_request:
-    branches: [develop, main]
-  push:
     branches: [develop, main]
 
 env:
@@ -51,7 +50,7 @@ jobs:
         run: |
           cd backend
           pip install -r requirements.txt
-          pip install pytest pytest-cov ruff black
+          pip install ruff black
       
       - name: Run Ruff (linter)
         run: |
@@ -68,8 +67,7 @@ jobs:
       - name: Run unit tests
         run: |
           cd backend
-          pytest -v --cov=. --cov-report=xml || echo "⚠️ No tests found yet (non-blocking)"
-        continue-on-error: true
+          pytest -v --cov=. --cov-report=xml
 
   # Frontend code quality & tests
   frontend-quality:
@@ -88,7 +86,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd openluffy-ui
-          npm ci || npm install
+          npm ci
       
       - name: Run ESLint
         run: |
@@ -99,17 +97,13 @@ jobs:
       - name: Run unit tests
         run: |
           cd openluffy-ui
-          npm run test:unit || echo "⚠️ No tests found yet (non-blocking)"
-        continue-on-error: true
+          npm run test:unit
 
-  # Build backend image
-  build-backend:
-    name: Build Backend Image
+  # Build images (no push) - validates Dockerfiles
+  build-validation:
+    name: Validate Docker Builds
     runs-on: ubuntu-latest
-    needs: [security-scan, backend-quality]
-    permissions:
-      contents: read
-      packages: write
+    needs: [security-scan, backend-quality, frontend-quality]
 
     steps:
       - name: Checkout code
@@ -118,102 +112,37 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build and push backend
+      - name: Build backend (validation only)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./backend/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          push: false
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:pr-${{ github.event.pull_request.number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Build frontend image
-  build-frontend:
-    name: Build Frontend Image
-    runs-on: ubuntu-latest
-    needs: [security-scan, frontend-quality]
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build and push frontend
+      - name: Build frontend (validation only)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./openluffy-ui/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          push: false
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:pr-${{ github.event.pull_request.number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Update Helm manifests (only on main branch)
-  update-manifests:
-    name: Update Helm Manifests
+  # Summary job - all checks passed
+  ci-success:
+    name: CI Success ✅
     runs-on: ubuntu-latest
-    needs: [build-backend, build-frontend]
-    if: github.ref == 'refs/heads/main'
-    permissions:
-      contents: write
-
+    needs: [security-scan, backend-quality, frontend-quality, build-validation]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update image tags in Helm values
+      - name: All checks passed
         run: |
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          sed -i "s|tag:.*|tag: main-${SHORT_SHA}|g" helm/openluffy/values.yaml
-          
-      - name: Commit and push changes
-        run: |
-          git config --global user.name 'GitHub Actions'
-          git config --global user.email 'actions@github.com'
-          git add helm/openluffy/values.yaml
-          git diff --staged --quiet || git commit -m "chore: update image tags to main-${SHORT_SHA}"
-          git push
+          echo "✅ Security scans passed"
+          echo "✅ Code quality checks passed"
+          echo "✅ Tests passed"
+          echo "✅ Docker builds validated"
+          echo ""
+          echo "PR is ready to merge!"
