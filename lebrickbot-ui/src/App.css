@@ -184,3 +184,52 @@ body {
     backdrop-filter: blur(2px);
   }
 }
+
+/* Collapsed Chat Bar */
+.chat-collapsed-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  background: #161b22;
+  border-top: 1px solid #30363d;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.chat-collapsed-bar:hover {
+  background: #1c2128;
+}
+
+.chat-collapsed-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chat-collapsed-icon {
+  font-size: 1rem;
+}
+
+.chat-collapsed-text {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #c9d1d9;
+}
+
+.chat-expand-btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  background: #21262d;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.chat-expand-btn:hover {
+  background: #30363d;
+  border-color: #484f58;
+}

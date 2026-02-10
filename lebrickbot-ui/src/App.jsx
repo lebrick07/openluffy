@@ -19,6 +19,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false) // Mobile sidebar state
   const [splitPosition, setSplitPosition] = useState(50) // Split position percentage
   const [isDragging, setIsDragging] = useState(false)
+  const [chatCollapsed, setChatCollapsed] = useState(false)
 
   const handleCreateNew = (type) => {
     setShowCreateModal(type)
@@ -142,25 +143,37 @@ function App() {
           {/* Split Screen Layout */}
           <div className="split-container">
             {/* Top: Dashboard */}
-            <main className="app-main split-top" style={{ height: `${splitPosition}%` }}>
+            <main className="app-main split-top" style={{ height: chatCollapsed ? 'calc(100% - 40px)' : `${splitPosition}%` }}>
               <div className="app-content">
                 {renderView()}
               </div>
             </main>
 
             {/* Draggable Divider */}
-            <div 
-              className={`split-divider ${isDragging ? 'dragging' : ''}`}
-              onMouseDown={handleMouseDown}
-            >
-              <div className="split-divider-handle">
-                <span>⋮⋮⋮</span>
+            {!chatCollapsed && (
+              <div 
+                className={`split-divider ${isDragging ? 'dragging' : ''}`}
+                onMouseDown={handleMouseDown}
+              >
+                <div className="split-divider-handle">
+                  <span>⋮⋮⋮</span>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Bottom: Luffy Chat (Always Visible) */}
-            <div className="split-bottom" style={{ height: `${100 - splitPosition}%` }}>
-              <AIChatPanel isOpen={true} />
+            {/* Bottom: Luffy Chat (Collapsible) */}
+            <div className="split-bottom" style={{ height: chatCollapsed ? 'auto' : `${100 - splitPosition}%` }}>
+              {chatCollapsed ? (
+                <div className="chat-collapsed-bar" onClick={() => setChatCollapsed(false)}>
+                  <div className="chat-collapsed-left">
+                    <span className="chat-collapsed-icon">⚔️</span>
+                    <span className="chat-collapsed-text">Luffy – Captain's Deck</span>
+                  </div>
+                  <button className="chat-expand-btn">▲ Expand</button>
+                </div>
+              ) : (
+                <AIChatPanel isOpen={true} onCollapse={() => setChatCollapsed(true)} />
+              )}
             </div>
           </div>
         </div>

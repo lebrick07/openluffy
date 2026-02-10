@@ -9,7 +9,7 @@ const CLAUDE_MODELS = [
   { id: 'claude-haiku-3', name: 'Claude Haiku 3', description: 'Fastest, most affordable' },
 ]
 
-function AIChatPanel({ isOpen }) {
+function AIChatPanel({ isOpen, onCollapse }) {
   const { activeCustomer } = useCustomer()
   const [messages, setMessages] = useState([])
   const [inputValue, setInputValue] = useState('')
@@ -162,6 +162,9 @@ function AIChatPanel({ isOpen }) {
         </div>
         
         <div className="ai-header-right">
+          <button className="chat-collapse-btn" onClick={onCollapse} title="Minimize chat">
+            <span>▼</span>
+          </button>
           <div className="model-selector">
             <button 
               className="model-selector-button"
