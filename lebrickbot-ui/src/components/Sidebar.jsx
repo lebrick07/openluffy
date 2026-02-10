@@ -15,8 +15,14 @@ function Sidebar({ currentView, setCurrentView, collapsed, setCollapsed }) {
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-header">
         <div className="sidebar-logo">
-          <span className="logo-icon">🤖</span>
-          {!collapsed && <span className="logo-text">LeBrickBot</span>}
+          {!collapsed ? (
+            <div className="logo-text-block">
+              <div className="logo-line">LUFFY</div>
+              <div className="logo-line sub">DEVOPS</div>
+            </div>
+          ) : (
+            <div className="logo-icon-text">L</div>
+          )}
         </div>
         <button className="collapse-btn" onClick={() => setCollapsed(!collapsed)}>
           {collapsed ? '→' : '←'}

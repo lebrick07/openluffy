@@ -1,0 +1,71 @@
+<svg width="160" height="45" viewBox="0 0 160 45" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .block { fill: #a855f7; }
+  </style>
+  
+  <!-- LUFFY - solid block terminal style -->
+  <g id="luffy">
+    <!-- L -->
+    <rect class="block" x="2" y="2" width="4" height="16"/>
+    <rect class="block" x="2" y="14" width="10" height="4"/>
+    
+    <!-- U -->
+    <rect class="block" x="16" y="2" width="4" height="14"/>
+    <rect class="block" x="16" y="14" width="10" height="4"/>
+    <rect class="block" x="22" y="2" width="4" height="16"/>
+    
+    <!-- F -->
+    <rect class="block" x="30" y="2" width="4" height="16"/>
+    <rect class="block" x="30" y="2" width="10" height="4"/>
+    <rect class="block" x="30" y="8" width="8" height="4"/>
+    
+    <!-- F -->
+    <rect class="block" x="44" y="2" width="4" height="16"/>
+    <rect class="block" x="44" y="2" width="10" height="4"/>
+    <rect class="block" x="44" y="8" width="8" height="4"/>
+    
+    <!-- Y -->
+    <rect class="block" x="58" y="2" width="4" height="7"/>
+    <rect class="block" x="66" y="2" width="4" height="7"/>
+    <rect class="block" x="62" y="7" width="4" height="11"/>
+  </g>
+  
+  <!-- DEVOPS - solid block terminal style -->
+  <g id="devops">
+    <!-- D -->
+    <rect class="block" x="2" y="25" width="4" height="16"/>
+    <rect class="block" x="2" y="25" width="8" height="4"/>
+    <rect class="block" x="6" y="29" width="4" height="8"/>
+    <rect class="block" x="2" y="37" width="8" height="4"/>
+    
+    <!-- E -->
+    <rect class="block" x="14" y="25" width="4" height="16"/>
+    <rect class="block" x="14" y="25" width="10" height="4"/>
+    <rect class="block" x="14" y="33" width="8" height="4"/>
+    <rect class="block" x="14" y="37" width="10" height="4"/>
+    
+    <!-- V -->
+    <rect class="block" x="28" y="25" width="4" height="10"/>
+    <rect class="block" x="36" y="25" width="4" height="10"/>
+    <rect class="block" x="32" y="35" width="4" height="6"/>
+    
+    <!-- O -->
+    <rect class="block" x="44" y="25" width="4" height="16"/>
+    <rect class="block" x="44" y="25" width="10" height="4"/>
+    <rect class="block" x="44" y="37" width="10" height="4"/>
+    <rect class="block" x="50" y="25" width="4" height="16"/>
+    
+    <!-- P -->
+    <rect class="block" x="58" y="25" width="4" height="16"/>
+    <rect class="block" x="58" y="25" width="10" height="4"/>
+    <rect class="block" x="64" y="29" width="4" height="4"/>
+    <rect class="block" x="58" y="33" width="10" height="4"/>
+    
+    <!-- S -->
+    <rect class="block" x="72" y="25" width="10" height="4"/>
+    <rect class="block" x="72" y="29" width="4" height="4"/>
+    <rect class="block" x="72" y="33" width="10" height="4"/>
+    <rect class="block" x="78" y="37" width="4" height="4"/>
+    <rect class="block" x="72" y="37" width="10" height="4"/>
+  </g>
+</svg>

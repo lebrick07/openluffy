@@ -28,20 +28,39 @@
 .sidebar-logo {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.75rem;
 }
 
-.logo-icon {
-  font-size: 1.75rem;
+.logo-text-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  line-height: 1;
 }
 
-.logo-text {
-  font-size: 1.25rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  white-space: nowrap;
+.logo-line {
+  font-family: 'Courier New', 'Courier', monospace;
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #a855f7;
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
+}
+
+.logo-line.sub {
+  font-size: 0.875rem;
+  letter-spacing: 0.2em;
+  color: #c084fc;
+  margin-left: 0.25rem;
+}
+
+.logo-icon-text {
+  font-family: 'Courier New', 'Courier', monospace;
+  font-size: 2rem;
+  font-weight: 900;
+  color: #a855f7;
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
 }
 
 .collapse-btn {

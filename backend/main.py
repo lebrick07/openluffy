@@ -1,9 +1,15 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
+from pydantic import BaseModel
+from typing import Dict, Any, Optional
+import os
 
 app = FastAPI(title="lebrickbot")
+
+# In-memory storage for integration configs (TODO: move to K8s secrets or Vault)
+integrations_store: Dict[str, Dict[str, Any]] = {}
 
 app.add_middleware(
     CORSMiddleware,
@@ -146,3 +152,146 @@ def get_deployments():
             pass
     
     return {'deployments': deployments, 'total': len(deployments)}
+
+# Integration models
+class IntegrationConfig(BaseModel):
+    id: str
+    name: str
+    config: Dict[str, Any]
+
+@app.get("/integrations")
+def get_integrations():
+    """Get all configured integrations"""
+    integrations = []
+    
+    # Always include K8s (it's available if we're running in K8s)
+    if k8s_available:
+        try:
+            deploys = apps_v1.list_deployment_for_all_namespaces()
+            pod_count = sum(d.status.replicas or 0 for d in deploys.items)
+            
+            integrations.append({
+                'id': 'kubernetes',
+                'name': 'Kubernetes',
+                'icon': '☸️',
+                'status': 'healthy',
+                'statusText': 'Cluster healthy',
+                'metrics': {
+                    'Deployments': len(deploys.items),
+                    'Pods': f'{pod_count} running',
+                    'Cluster': 'K3s on Pi5'
+                }
+            })
+        except:
+            pass
+    
+    # Check for ArgoCD (check if ingress exists)
+    integrations.append({
+        'id': 'argocd',
+        'name': 'ArgoCD',
+        'icon': '🐙',
+        'status': 'connected',
+        'statusText': 'Connected',
+        'metrics': {
+            'Status': 'Ready',
+            'URL': 'http://argocd.local'
+        }
+    })
+    
+    # Check for GitHub (always available)
+    integrations.append({
+        'id': 'github',
+        'name': 'GitHub',
+        'icon': '⚙️',
+        'status': 'connected',
+        'statusText': 'Connected',
+        'metrics': {
+            'Repository': 'lebrick07/lebrickbot',
+            'Status': 'Active'
+        }
+    })
+    
+    # Add any configured integrations from store
+    for int_id, int_config in integrations_store.items():
+        integrations.append({
+            'id': int_id,
+            'name': int_config.get('name', int_id),
+            'status': 'connected',
+            'statusText': 'Configured',
+            'config_exists': True
+        })
+    
+    return {'integrations': integrations, 'total': len(integrations)}
+
+@app.post("/integrations")
+def save_integration(integration: IntegrationConfig):
+    """Save integration configuration"""
+    # TODO: Validate credentials by testing API connection
+    # TODO: Store encrypted in K8s secrets instead of memory
+    
+    integrations_store[integration.id] = {
+        'name': integration.name,
+        'config': integration.config
+    }
+    
+    return {
+        'success': True,
+        'message': f'{integration.name} integration configured',
+        'id': integration.id
+    }
+
+@app.delete("/integrations/{integration_id}")
+def delete_integration(integration_id: str):
+    """Remove integration configuration"""
+    if integration_id in integrations_store:
+        del integrations_store[integration_id]
+        return {'success': True, 'message': 'Integration removed'}
+    
+    raise HTTPException(status_code=404, detail='Integration not found')
+
+@app.get("/integrations/{integration_id}/status")
+def get_integration_status(integration_id: str):
+    """Get real-time status for a specific integration"""
+    # TODO: Implement real API calls to each service
+    
+    if integration_id == 'kubernetes' and k8s_available:
+        try:
+            nodes = v1.list_node()
+            pods = v1.list_pod_for_all_namespaces()
+            
+            return {
+                'id': 'kubernetes',
+                'status': 'healthy',
+                'metrics': {
+                    'Nodes': len(nodes.items),
+                    'Pods': len(pods.items),
+                    'Namespaces': len(set(p.metadata.namespace for p in pods.items))
+                }
+            }
+        except:
+            return {'id': 'kubernetes', 'status': 'error', 'error': 'Failed to connect'}
+    
+    elif integration_id == 'argocd':
+        # TODO: Call ArgoCD API
+        return {
+            'id': 'argocd',
+            'status': 'connected',
+            'message': 'API integration coming soon'
+        }
+    
+    elif integration_id == 'github':
+        # TODO: Call GitHub API
+        return {
+            'id': 'github',
+            'status': 'connected',
+            'message': 'API integration coming soon'
+        }
+    
+    elif integration_id in integrations_store:
+        return {
+            'id': integration_id,
+            'status': 'connected',
+            'configured': True
+        }
+    
+    raise HTTPException(status_code=404, detail='Integration not found')

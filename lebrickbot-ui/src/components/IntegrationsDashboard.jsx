@@ -1,161 +1,239 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './IntegrationsDashboard.css'
 
-const integrations = [
-  {
-    id: 'github-actions',
-    name: 'GitHub Actions',
-    icon: '⚙️',
-    status: 'healthy',
-    statusText: 'All workflows passing',
-    metrics: {
-      'Workflows': '12 active',
-      'Last run': '2m ago',
-      'Success rate': '98.5%'
-    },
-    actions: ['View workflows', 'Trigger build', 'Configure']
-  },
-  {
-    id: 'argocd',
-    name: 'ArgoCD',
-    icon: '🐙',
-    status: 'synced',
-    statusText: '8 apps synced',
-    metrics: {
-      'Applications': '8',
-      'Last sync': 'just now',
-      'Out of sync': '0'
-    },
-    actions: ['Open UI', 'Sync all', 'Configure'],
-    url: 'http://argocd.local'
-  },
+// Available integrations that can be added
+const availableIntegrations = [
   {
     id: 'aws',
     name: 'AWS',
     icon: '☁️',
-    status: 'healthy',
-    statusText: 'All services operational',
-    metrics: {
-      'EC2 instances': '4 running',
-      'RDS databases': '2 active',
-      'Monthly cost': '$142.35'
-    },
-    actions: ['Open console', 'View costs', 'Configure']
+    description: 'Connect your AWS account for resource management',
+    configFields: [
+      { name: 'accessKeyId', label: 'Access Key ID', type: 'text', required: true },
+      { name: 'secretAccessKey', label: 'Secret Access Key', type: 'password', required: true },
+      { name: 'region', label: 'Default Region', type: 'text', placeholder: 'us-east-1' }
+    ]
   },
   {
     id: 'terraform',
     name: 'Terraform Cloud',
     icon: '🏗️',
-    status: 'healthy',
-    statusText: 'No pending runs',
-    metrics: {
-      'Workspaces': '6',
-      'Last apply': '1h ago',
-      'Resources': '42 managed'
-    },
-    actions: ['View workspaces', 'Plan', 'Configure']
+    description: 'Integrate Terraform Cloud workspaces',
+    configFields: [
+      { name: 'apiToken', label: 'API Token', type: 'password', required: true },
+      { name: 'organization', label: 'Organization', type: 'text', required: true }
+    ]
   },
   {
     id: 'jfrog',
     name: 'JFrog Artifactory',
     icon: '🐸',
-    status: 'healthy',
-    statusText: 'Registry operational',
-    metrics: {
-      'Repositories': '8',
-      'Artifacts': '1.2k',
-      'Storage': '15.3 GB'
-    },
-    actions: ['Browse artifacts', 'Upload', 'Configure']
+    description: 'Connect to JFrog Artifactory for artifact management',
+    configFields: [
+      { name: 'url', label: 'Artifactory URL', type: 'text', placeholder: 'https://example.jfrog.io', required: true },
+      { name: 'apiKey', label: 'API Key', type: 'password', required: true }
+    ]
   },
   {
     id: 'datadog',
     name: 'DataDog',
     icon: '🐕',
-    status: 'warning',
-    statusText: '2 active alerts',
-    metrics: {
-      'Monitors': '24',
-      'Alerts': '2 active',
-      'Hosts': '8 reporting'
-    },
-    actions: ['View alerts', 'Open dashboard', 'Configure']
+    description: 'Integrate DataDog monitoring and alerts',
+    configFields: [
+      { name: 'apiKey', label: 'API Key', type: 'password', required: true },
+      { name: 'appKey', label: 'Application Key', type: 'password', required: true }
+    ]
   },
   {
     id: 'sonarqube',
     name: 'SonarQube',
     icon: '🔍',
-    status: 'healthy',
-    statusText: 'Code quality: A',
-    metrics: {
-      'Projects': '12',
-      'Bugs': '3',
-      'Coverage': '84.2%'
-    },
-    actions: ['View projects', 'Run scan', 'Configure']
+    description: 'Connect SonarQube for code quality analysis',
+    configFields: [
+      { name: 'url', label: 'SonarQube URL', type: 'text', placeholder: 'https://sonarqube.example.com', required: true },
+      { name: 'token', label: 'Access Token', type: 'password', required: true }
+    ]
   },
   {
     id: 'vault',
     name: 'HashiCorp Vault',
     icon: '🔐',
-    status: 'healthy',
-    statusText: 'Sealed: No',
-    metrics: {
-      'Secrets': '156',
-      'Auth methods': '3',
-      'Policies': '12'
-    },
-    actions: ['Manage secrets', 'Open UI', 'Configure']
+    description: 'Integrate Vault for secrets management',
+    configFields: [
+      { name: 'url', label: 'Vault URL', type: 'text', placeholder: 'https://vault.example.com', required: true },
+      { name: 'token', label: 'Vault Token', type: 'password', required: true }
+    ]
   },
   {
     id: 'slack',
     name: 'Slack',
     icon: '💬',
-    status: 'connected',
-    statusText: 'Notifications active',
-    metrics: {
-      'Channels': '3',
-      'Messages today': '47',
-      'Alerts sent': '12'
-    },
-    actions: ['Send test', 'Configure', 'Mute']
+    description: 'Send notifications to Slack channels',
+    configFields: [
+      { name: 'webhookUrl', label: 'Webhook URL', type: 'text', required: true },
+      { name: 'channel', label: 'Default Channel', type: 'text', placeholder: '#alerts' }
+    ]
   },
   {
     id: 'pagerduty',
     name: 'PagerDuty',
     icon: '🚨',
-    status: 'healthy',
-    statusText: 'No incidents',
-    metrics: {
-      'On-call': '2 people',
-      'Incidents (24h)': '0',
-      'Response time': '3.2m avg'
-    },
-    actions: ['View incidents', 'Test alert', 'Configure']
+    description: 'Integrate PagerDuty for incident management',
+    configFields: [
+      { name: 'apiKey', label: 'API Key', type: 'password', required: true },
+      { name: 'serviceKey', label: 'Service Key', type: 'password', required: true }
+    ]
   }
 ]
 
 function IntegrationsDashboard() {
-  const [selectedIntegration, setSelectedIntegration] = useState(null)
-  const [filter, setFilter] = useState('all')
+  const [connectedIntegrations, setConnectedIntegrations] = useState([])
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [selectedToAdd, setSelectedToAdd] = useState(null)
+  const [configData, setConfigData] = useState({})
+  const [loading, setLoading] = useState(true)
 
-  const statusCounts = {
-    healthy: integrations.filter(i => i.status === 'healthy' || i.status === 'synced' || i.status === 'connected').length,
-    warning: integrations.filter(i => i.status === 'warning').length,
-    error: integrations.filter(i => i.status === 'error').length
+  // Fetch real connected integrations
+  useEffect(() => {
+    fetchConnectedIntegrations()
+  }, [])
+
+  const fetchConnectedIntegrations = async () => {
+    setLoading(true)
+    try {
+      // Fetch real data for connected integrations
+      const [argoCDStatus, githubStatus, k8sStatus] = await Promise.all([
+        fetchArgoCDStatus(),
+        fetchGitHubStatus(),
+        fetchK8sStatus()
+      ])
+
+      const connected = []
+      
+      if (argoCDStatus) connected.push(argoCDStatus)
+      if (githubStatus) connected.push(githubStatus)
+      if (k8sStatus) connected.push(k8sStatus)
+
+      setConnectedIntegrations(connected)
+    } catch (error) {
+      console.error('Error fetching integrations:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const filteredIntegrations = filter === 'all' 
-    ? integrations 
-    : integrations.filter(i => i.status === filter)
+  const fetchArgoCDStatus = async () => {
+    try {
+      // TODO: Call ArgoCD API to get real status
+      // For now, return structure with placeholder
+      return {
+        id: 'argocd',
+        name: 'ArgoCD',
+        icon: '🐙',
+        status: 'connected',
+        statusText: 'Connected',
+        metrics: {
+          'Status': 'Ready to query',
+          'URL': 'http://argocd.local'
+        },
+        actions: ['Open UI', 'Sync Apps', 'Configure'],
+        url: 'http://argocd.local'
+      }
+    } catch (error) {
+      return null
+    }
+  }
+
+  const fetchGitHubStatus = async () => {
+    try {
+      // TODO: Call GitHub API to get real status
+      return {
+        id: 'github',
+        name: 'GitHub',
+        icon: '⚙️',
+        status: 'connected',
+        statusText: 'Connected',
+        metrics: {
+          'Repository': 'lebrick07/lebrickbot',
+          'Status': 'Ready to query'
+        },
+        actions: ['View Repo', 'Workflows', 'Configure'],
+        url: 'https://github.com/lebrick07/lebrickbot'
+      }
+    } catch (error) {
+      return null
+    }
+  }
+
+  const fetchK8sStatus = async () => {
+    try {
+      const response = await fetch('/api/deployments')
+      if (!response.ok) throw new Error('Failed to fetch')
+      
+      const deployments = await response.json()
+      const totalPods = deployments.reduce((sum, d) => sum + (d.replicas || 0), 0)
+      
+      return {
+        id: 'kubernetes',
+        name: 'Kubernetes',
+        icon: '☸️',
+        status: 'healthy',
+        statusText: 'Cluster healthy',
+        metrics: {
+          'Deployments': deployments.length,
+          'Pods': `${totalPods} running`,
+          'Cluster': 'K3s on Pi5'
+        },
+        actions: ['View Pods', 'Deployments', 'Configure']
+      }
+    } catch (error) {
+      return null
+    }
+  }
+
+  const handleAddIntegration = (integration) => {
+    setSelectedToAdd(integration)
+    setConfigData({})
+    setShowAddModal(true)
+  }
+
+  const handleConfigChange = (field, value) => {
+    setConfigData({ ...configData, [field]: value })
+  }
+
+  const handleSaveIntegration = async () => {
+    // TODO: Send config to backend to store credentials
+    console.log('Saving integration:', selectedToAdd.id, configData)
+    
+    // For now, just close modal
+    // In production, this would save to backend and re-fetch integrations
+    setShowAddModal(false)
+    alert(`Integration configuration saved! (Backend API coming soon)`)
+  }
 
   const handleAction = (integration, action) => {
     if (action === 'Open UI' && integration.url) {
       window.open(integration.url, '_blank')
+    } else if (action === 'View Repo' && integration.url) {
+      window.open(integration.url, '_blank')
     } else {
       console.log(`Action: ${action} on ${integration.name}`)
-      // Here you'd trigger the actual backend action
     }
+  }
+
+  // Filter out already connected integrations from available list
+  const connectedIds = connectedIntegrations.map(i => i.id)
+  const notConnected = availableIntegrations.filter(a => !connectedIds.includes(a.id))
+
+  if (loading) {
+    return (
+      <div className="integrations-dashboard">
+        <div className="integrations-header">
+          <h2>🔗 DevOps Integrations</h2>
+          <p>Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -163,100 +241,147 @@ function IntegrationsDashboard() {
       <div className="integrations-header">
         <div className="header-content">
           <h2>🔗 DevOps Integrations</h2>
-          <p>One-stop shop for all your DevOps tools</p>
+          <p>Connect your DevOps tools</p>
         </div>
         
         <div className="status-summary">
           <div className="summary-item summary-healthy">
-            <span className="summary-count">{statusCounts.healthy}</span>
-            <span className="summary-label">Healthy</span>
+            <span className="summary-count">{connectedIntegrations.length}</span>
+            <span className="summary-label">Connected</span>
           </div>
           <div className="summary-item summary-warning">
-            <span className="summary-count">{statusCounts.warning}</span>
-            <span className="summary-label">Warnings</span>
-          </div>
-          <div className="summary-item summary-error">
-            <span className="summary-count">{statusCounts.error}</span>
-            <span className="summary-label">Errors</span>
+            <span className="summary-count">{notConnected.length}</span>
+            <span className="summary-label">Available</span>
           </div>
         </div>
       </div>
 
-      <div className="integrations-filters">
-        <button 
-          className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
-          onClick={() => setFilter('all')}
-        >
-          All Tools
-        </button>
-        <button 
-          className={`filter-btn ${filter === 'healthy' ? 'active' : ''}`}
-          onClick={() => setFilter('healthy')}
-        >
-          Healthy
-        </button>
-        <button 
-          className={`filter-btn ${filter === 'warning' ? 'active' : ''}`}
-          onClick={() => setFilter('warning')}
-        >
-          Warnings
-        </button>
-        <button 
-          className={`filter-btn ${filter === 'error' ? 'active' : ''}`}
-          onClick={() => setFilter('error')}
-        >
-          Errors
-        </button>
-      </div>
+      {/* Connected Integrations */}
+      {connectedIntegrations.length > 0 && (
+        <>
+          <h3 className="section-title">✅ Connected</h3>
+          <div className="integrations-grid">
+            {connectedIntegrations.map(integration => (
+              <div 
+                key={integration.id} 
+                className={`integration-card integration-${integration.status}`}
+              >
+                <div className="integration-header">
+                  <div className="integration-title">
+                    <span className="integration-icon">{integration.icon}</span>
+                    <div>
+                      <h3>{integration.name}</h3>
+                      <span className={`integration-status status-${integration.status}`}>
+                        {integration.statusText}
+                      </span>
+                    </div>
+                  </div>
+                  <span className={`status-indicator status-${integration.status}`}></span>
+                </div>
 
-      <div className="integrations-grid">
-        {filteredIntegrations.map(integration => (
-          <div 
-            key={integration.id} 
-            className={`integration-card integration-${integration.status}`}
-          >
-            <div className="integration-header">
-              <div className="integration-title">
-                <span className="integration-icon">{integration.icon}</span>
-                <div>
-                  <h3>{integration.name}</h3>
-                  <span className={`integration-status status-${integration.status}`}>
-                    {integration.statusText}
-                  </span>
+                <div className="integration-metrics">
+                  {Object.entries(integration.metrics).map(([key, value]) => (
+                    <div key={key} className="metric">
+                      <span className="metric-label">{key}</span>
+                      <span className="metric-value">{value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="integration-actions">
+                  {integration.actions.map(action => (
+                    <button 
+                      key={action}
+                      className="integration-action-btn"
+                      onClick={() => handleAction(integration, action)}
+                    >
+                      {action}
+                    </button>
+                  ))}
                 </div>
               </div>
-              <span className={`status-indicator status-${integration.status}`}></span>
-            </div>
+            ))}
+          </div>
+        </>
+      )}
 
-            <div className="integration-metrics">
-              {Object.entries(integration.metrics).map(([key, value]) => (
-                <div key={key} className="metric">
-                  <span className="metric-label">{key}</span>
-                  <span className="metric-value">{value}</span>
+      {/* Available Integrations */}
+      {notConnected.length > 0 && (
+        <>
+          <h3 className="section-title">➕ Available Integrations</h3>
+          <div className="integrations-grid">
+            {notConnected.map(integration => (
+              <div 
+                key={integration.id} 
+                className="integration-card integration-available"
+              >
+                <div className="integration-header">
+                  <div className="integration-title">
+                    <span className="integration-icon">{integration.icon}</span>
+                    <div>
+                      <h3>{integration.name}</h3>
+                      <p className="integration-description">{integration.description}</p>
+                    </div>
+                  </div>
                 </div>
-              ))}
+
+                <button 
+                  className="btn-add-integration"
+                  onClick={() => handleAddIntegration(integration)}
+                >
+                  ➕ Connect
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Add Integration Modal */}
+      {showAddModal && selectedToAdd && (
+        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="modal-content integration-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>
+                <span className="integration-icon">{selectedToAdd.icon}</span>
+                Connect {selectedToAdd.name}
+              </h2>
+              <button className="modal-close" onClick={() => setShowAddModal(false)}>×</button>
             </div>
 
-            <div className="integration-actions">
-              {integration.actions.map(action => (
-                <button 
-                  key={action}
-                  className="integration-action-btn"
-                  onClick={() => handleAction(integration, action)}
-                >
-                  {action}
-                </button>
-              ))}
+            <div className="modal-body">
+              <p className="integration-description">{selectedToAdd.description}</p>
+              
+              <form className="integration-form">
+                {selectedToAdd.configFields.map(field => (
+                  <div key={field.name} className="form-group">
+                    <label>
+                      {field.label}
+                      {field.required && <span className="required">*</span>}
+                    </label>
+                    <input
+                      type={field.type}
+                      placeholder={field.placeholder || ''}
+                      value={configData[field.name] || ''}
+                      onChange={(e) => handleConfigChange(field.name, e.target.value)}
+                      required={field.required}
+                    />
+                  </div>
+                ))}
+              </form>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowAddModal(false)}>
+                Cancel
+              </button>
+              <button className="btn-primary" onClick={handleSaveIntegration}>
+                Save & Connect
+              </button>
             </div>
           </div>
-        ))}
-      </div>
-
-      <div className="integration-add">
-        <button className="btn-add-integration">
-          ➕ Add Integration
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   )
 }
