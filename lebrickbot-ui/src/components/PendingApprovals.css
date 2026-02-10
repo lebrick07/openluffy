@@ -1,0 +1,253 @@
+.pending-approvals {
+  background: #1a202c;
+  border: 2px solid #4a5568;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.pending-approvals.has-approvals {
+  border-color: #ed8936;
+  border-width: 3px;
+  animation: pulse-border 2s infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    border-color: #ed8936;
+  }
+  50% {
+    border-color: #f6ad55;
+  }
+}
+
+.approvals-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.pending-approvals h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #f7fafc;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.approval-count {
+  background: #ed8936;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.loading-approvals {
+  text-align: center;
+  padding: 2rem;
+  color: #a0aec0;
+}
+
+.no-approvals {
+  border-color: #48bb78;
+}
+
+.no-approvals-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.check-icon {
+  font-size: 3rem;
+  color: #48bb78;
+}
+
+.no-approvals-message p {
+  margin: 0;
+  color: #a0aec0;
+  font-size: 1.125rem;
+}
+
+.approvals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.approval-card {
+  background: #2d3748;
+  border: 2px solid #4a5568;
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: all 0.2s ease;
+}
+
+.approval-card:hover {
+  border-color: #ed8936;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(237, 137, 54, 0.3);
+}
+
+.approval-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #4a5568;
+}
+
+.approval-header h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.5rem;
+  color: #f7fafc;
+}
+
+.approval-status {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  background: rgba(237, 137, 54, 0.2);
+  color: #ed8936;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.btn-approve {
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-approve:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
+}
+
+.btn-approve:disabled,
+.btn-approve.promoting {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.approval-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.env-comparison {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 1rem;
+  align-items: center;
+}
+
+.env-box {
+  background: rgba(255, 255, 255, 0.02);
+  border: 2px solid #4a5568;
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.env-preprod {
+  border-color: #ed8936;
+  background: rgba(237, 137, 54, 0.05);
+}
+
+.env-prod {
+  border-color: #4a5568;
+}
+
+.env-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #a0aec0;
+  letter-spacing: 0.05em;
+}
+
+.env-image {
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
+  color: #f7fafc;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.env-status {
+  font-size: 0.875rem;
+  color: #a0aec0;
+  padding-top: 0.5rem;
+  border-top: 1px solid #4a5568;
+}
+
+.arrow {
+  font-size: 2rem;
+  color: #ed8936;
+  font-weight: bold;
+}
+
+.approval-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 1rem;
+  border-top: 1px solid #4a5568;
+}
+
+.link-argocd {
+  color: #667eea;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.2s ease;
+}
+
+.link-argocd:hover {
+  color: #5568d3;
+  transform: translateX(4px);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .approval-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .btn-approve {
+    width: 100%;
+  }
+
+  .env-comparison {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+  }
+
+  .arrow {
+    text-align: center;
+    transform: rotate(90deg);
+  }
+}

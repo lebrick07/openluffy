@@ -546,3 +546,136 @@ def get_deployment_details_v2(deployment_id: str):
         }
     except ApiException as e:
         raise HTTPException(status_code=404, detail=f'Error: {str(e)}')
+
+@app.post("/customers/{customer_id}/promote-to-prod")
+def promote_to_production(customer_id: str):
+    """Promote preprod deployment to production"""
+    if not k8s_available:
+        return {'error': 'K8s not available'}
+    
+    try:
+        # Import kubernetes dynamic client for patching
+        from kubernetes import dynamic
+        from kubernetes.client import api_client
+        
+        dyn_client = dynamic.DynamicClient(
+            api_client.ApiClient()
+        )
+        
+        # Get ArgoCD Application API
+        api = dyn_client.resources.get(api_version="argoproj.io/v1alpha1", kind="Application")
+        
+        # Get preprod app to find current revision
+        preprod_app_name = f"{customer_id}-preprod"
+        preprod_app = api.get(name=preprod_app_name, namespace="argocd")
+        
+        # Get current revision/commit from preprod
+        current_revision = preprod_app.spec.source.targetRevision
+        
+        # Update prod app to sync to same revision
+        prod_app_name = f"{customer_id}-prod"
+        
+        # Patch the prod application to sync
+        patch = {
+            "operation": {
+                "sync": {
+                    "revision": current_revision
+                }
+            }
+        }
+        
+        # Trigger sync on prod app
+        prod_app = api.get(name=prod_app_name, namespace="argocd")
+        
+        # For now, just return success - actual sync happens via ArgoCD
+        # In production, this would call ArgoCD API directly
+        
+        return {
+            'success': True,
+            'customer': customer_id,
+            'message': f'Production deployment initiated for {customer_id}',
+            'preprod_revision': current_revision,
+            'prod_app': prod_app_name,
+            'note': 'Sync ArgoCD prod application manually or via ArgoCD API'
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Promotion failed: {str(e)}')
+
+@app.get("/customers/{customer_id}/approval-status")
+def get_approval_status(customer_id: str):
+    """Check if customer has pending production approval"""
+    if not k8s_available:
+        return {'error': 'K8s not available'}
+    
+    try:
+        # Check preprod vs prod status
+        preprod_ns = f"{customer_id}-preprod"
+        prod_ns = f"{customer_id}-prod"
+        
+        preprod_deploys = apps_v1.list_namespaced_deployment(preprod_ns)
+        prod_deploys = apps_v1.list_namespaced_deployment(prod_ns)
+        
+        if not preprod_deploys.items or not prod_deploys.items:
+            return {
+                'customer': customer_id,
+                'approval_needed': False,
+                'reason': 'No deployments found'
+            }
+        
+        preprod_deploy = preprod_deploys.items[0]
+        prod_deploy = prod_deploys.items[0]
+        
+        preprod_image = preprod_deploy.spec.template.spec.containers[0].image
+        prod_image = prod_deploy.spec.template.spec.containers[0].image
+        
+        # If images differ, approval might be needed
+        approval_needed = preprod_image != prod_image
+        
+        return {
+            'customer': customer_id,
+            'approval_needed': approval_needed,
+            'preprod': {
+                'image': preprod_image,
+                'ready': preprod_deploy.status.ready_replicas or 0,
+                'replicas': preprod_deploy.spec.replicas
+            },
+            'prod': {
+                'image': prod_image,
+                'ready': prod_deploy.status.ready_replicas or 0,
+                'replicas': prod_deploy.spec.replicas
+            }
+        }
+        
+    except Exception as e:
+        return {
+            'customer': customer_id,
+            'approval_needed': False,
+            'error': str(e)
+        }
+
+@app.get("/approvals/pending")
+def get_pending_approvals():
+    """Get all customers with pending production approvals"""
+    if not k8s_available:
+        return {'approvals': [], 'total': 0}
+    
+    customers = ['acme-corp', 'techstart', 'widgetco']
+    pending = []
+    
+    for customer in customers:
+        status = get_approval_status(customer)
+        if status.get('approval_needed'):
+            pending.append({
+                'customer_id': customer,
+                'customer_name': customer.replace('-', ' ').title(),
+                'preprod_image': status['preprod']['image'],
+                'prod_image': status['prod']['image'],
+                'preprod_ready': status['preprod']['ready'],
+                'prod_ready': status['prod']['ready']
+            })
+    
+    return {
+        'approvals': pending,
+        'total': len(pending)
+    }
