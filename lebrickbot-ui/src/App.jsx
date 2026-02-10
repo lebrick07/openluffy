@@ -1,47 +1,77 @@
 import { useState } from 'react'
 import './App.css'
+import Sidebar from './components/Sidebar'
 import CustomerDeploymentsView from './components/CustomerDeploymentsView'
 import PendingApprovals from './components/PendingApprovals'
 import IntegrationsDashboard from './components/IntegrationsDashboard'
+import K8sInsights from './components/K8sInsights'
+import PipelinesView from './components/PipelinesView'
 
 function App() {
-  const [currentView, setCurrentView] = useState('deployments')
+  const [activeView, setActiveView] = useState('dashboard')
 
-  return (
-    <div className="app-container">
-      <div className="app-header">
-        <div className="header-content">
-          <h1>🏴‍☠️ LeBrickBot</h1>
-          <p className="header-subtitle">DevOps Automation Platform</p>
-        </div>
-        <div className="header-nav">
-          <button 
-            className={`nav-btn ${currentView === 'deployments' ? 'active' : ''}`}
-            onClick={() => setCurrentView('deployments')}
-          >
-            🚀 Deployments
-          </button>
-          <button 
-            className={`nav-btn ${currentView === 'integrations' ? 'active' : ''}`}
-            onClick={() => setCurrentView('integrations')}
-          >
-            🔗 Integrations
-          </button>
-        </div>
-      </div>
-
-      <div className="app-body">
-        {currentView === 'deployments' && (
+  const renderView = () => {
+    switch (activeView) {
+      case 'dashboard':
+        return (
           <>
             <PendingApprovals />
             <CustomerDeploymentsView />
           </>
-        )}
+        )
+      case 'k8s':
+        return <K8sInsights />
+      case 'pipelines':
+        return <PipelinesView />
+      case 'approvals':
+        return (
+          <div className="view-container">
+            <div className="view-header">
+              <h1>✅ Production Approvals</h1>
+              <p className="view-subtitle">Preprod → Prod promotion workflow</p>
+            </div>
+            <PendingApprovals />
+          </div>
+        )
+      case 'integrations':
+        return <IntegrationsDashboard />
+      case 'monitoring':
+        return (
+          <div className="view-container">
+            <div className="view-header">
+              <h1>📈 Monitoring</h1>
+              <p className="view-subtitle">Metrics, logs, and alerts</p>
+            </div>
+            <div className="coming-soon">
+              <p>🚧 Under Construction</p>
+              <p className="coming-soon-detail">Prometheus, Grafana, and log aggregation coming soon...</p>
+            </div>
+          </div>
+        )
+      case 'settings':
+        return (
+          <div className="view-container">
+            <div className="view-header">
+              <h1>⚙️ Settings</h1>
+              <p className="view-subtitle">Configuration and preferences</p>
+            </div>
+            <div className="coming-soon">
+              <p>🚧 Under Construction</p>
+              <p className="coming-soon-detail">Configuration options coming soon...</p>
+            </div>
+          </div>
+        )
+      default:
+        return <CustomerDeploymentsView />
+    }
+  }
 
-        {currentView === 'integrations' && (
-          <IntegrationsDashboard />
-        )}
-      </div>
+  return (
+    <div className="app">
+      <Sidebar activeView={activeView} onViewChange={setActiveView} />
+      <main className="app-main">
+        {renderView()}
+      </main>
     </div>
   )
 }
