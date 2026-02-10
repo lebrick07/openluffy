@@ -1,39 +1,73 @@
-# ArgoCD Setup
+# OpenLuffy ArgoCD Configuration
 
-## Deploy Luffy Application
+## 2 Deployment Pipelines
 
-Apply the ArgoCD Application to your cluster:
+### 1. Nonprod Pipeline (develop branch)
+**Managed by:** `release-dev.yaml` workflow
 
-```bash
-kubectl apply -f argocd/luffy-application.yaml
+**ArgoCD Applications:**
+- `openluffy-dev` (dev.openluffy.local)
+- `openluffy-preprod` (preprod.openluffy.local)
+
+**Workflow:**
+```
+Merge to develop
+  ↓
+release-dev.yaml triggers
+  ↓
+Build multi-arch images (dev-<sha>)
+  ↓
+Update dev values → ArgoCD syncs dev
+  ↓
+Wait 30s
+  ↓
+Update preprod values → ArgoCD syncs preprod
 ```
 
-This will:
-- Deploy Luffy from the Helm chart in `helm/openluffy/`
-- Watch the `main` branch for changes
-- Auto-sync on git pushes (automated GitOps)
-- Self-heal if resources drift from desired state
+### 2. Production Pipeline (main branch)
+**Managed by:** `release-prod.yaml` workflow
 
-## Access ArgoCD UI
+**ArgoCD Application:**
+- `openluffy-prod` (openluffy.local)
 
-```bash
-# URL: http://argocd.local
-# Username: admin
-# Password: uqVa1xRvqz5KIh-2
+**Workflow:**
+```
+Merge to main
+  ↓
+release-prod.yaml triggers
+  ↓
+Build multi-arch images (main-<sha>)
+  ↓
+Update prod values → ArgoCD syncs prod
 ```
 
-## CI/CD Flow
+---
 
-1. **Push to main** → GitHub Actions builds Docker images
-2. **Images pushed** to `ghcr.io/lebrick07/openluffy-{backend,frontend}`
-3. **Image tags updated** in `helm/openluffy/values.yaml`
-4. **ArgoCD detects change** → auto-syncs to K8s cluster
-5. **New version deployed** automatically
-
-## Manual Sync
-
-Force sync from ArgoCD UI or CLI:
+## Apply ArgoCD Applications
 
 ```bash
-argocd app sync luffy
+# Nonprod pipeline apps
+kubectl apply -f openluffy-dev.yaml
+kubectl apply -f openluffy-preprod.yaml
+
+# Prod pipeline app
+kubectl apply -f openluffy-prod.yaml
+```
+
+---
+
+## Customer Apps (Same Pattern)
+
+Each customer should have:
+- **Nonprod pipeline:** 2 apps (dev, preprod) watching develop branch
+- **Prod pipeline:** 1 app (prod) watching main branch
+
+Example for Acme Corp:
+```yaml
+# Nonprod pipeline (develop branch)
+- acme-corp-dev
+- acme-corp-preprod
+
+# Prod pipeline (main branch)
+- acme-corp-prod
 ```

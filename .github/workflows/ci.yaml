@@ -1,15 +1,9 @@
 name: CI Pipeline
 
-# Runs on pull requests AND pushes to feature branches
+# Runs ONLY when PR exists (not on every push)
 on:
   pull_request:
     branches: [develop, main]
-  push:
-    branches:
-      - 'feature/**'
-      - 'fix/**'
-      - 'chore/**'
-      - 'docs/**'
 
 env:
   REGISTRY: ghcr.io

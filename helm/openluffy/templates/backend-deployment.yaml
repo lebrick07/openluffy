@@ -19,8 +19,6 @@ spec:
         component: backend
     spec:
       serviceAccountName: {{ .Release.Name }}-backend
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: backend
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
