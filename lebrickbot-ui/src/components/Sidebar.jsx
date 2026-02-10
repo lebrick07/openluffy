@@ -59,9 +59,9 @@ function Sidebar({ activeView, onViewChange }) {
     <div className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-header">
         {!collapsed ? (
-          <span className="sidebar-brand">Luffy</span>
+          <span className="sidebar-brand">Luffy DevOps</span>
         ) : (
-          <span className="sidebar-brand-icon">🏴‍☠️</span>
+          <span className="sidebar-brand-icon">⚔️</span>
         )}
         <button 
           className="collapse-btn"

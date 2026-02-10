@@ -8,6 +8,7 @@ function TopNavbar({ onCreateNew, selectedEnvironment, onEnvironmentChange }) {
   const [notifications, setNotifications] = useState([])
   const [showNotifications, setShowNotifications] = useState(false)
   const [showCreateMenu, setShowCreateMenu] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
@@ -36,10 +37,8 @@ function TopNavbar({ onCreateNew, selectedEnvironment, onEnvironmentChange }) {
 
   return (
     <nav className="top-navbar">
-      {/* Left Section: Icon + Filters */}
+      {/* Left Section: Filters */}
       <div className="navbar-left">
-        <span className="navbar-icon">🏴‍☠️</span>
-
         <div className="navbar-filters">
           <select 
             className="filter-select"
@@ -76,60 +75,9 @@ function TopNavbar({ onCreateNew, selectedEnvironment, onEnvironmentChange }) {
         />
       </div>
 
-      {/* Right Section: Compact Actions */}
+      {/* Right Section: Create | Notifications | Links | User */}
       <div className="navbar-right">
-        {/* System Status - Compact */}
-        <div className={`status-indicator ${systemStatus.healthy ? 'healthy' : 'unhealthy'}`} title={systemStatus.loading ? 'Checking...' : systemStatus.healthy ? 'All Systems Operational' : 'System Issues Detected'}>
-          <span className="status-dot"></span>
-        </div>
-
-        {/* Notifications */}
-        <div className="navbar-notifications">
-          <button 
-            className="icon-btn"
-            onClick={() => setShowNotifications(!showNotifications)}
-            title="Notifications"
-          >
-            🔔
-            {notificationCount > 0 && (
-              <span className="notification-badge">{notificationCount}</span>
-            )}
-          </button>
-          
-          {showNotifications && (
-            <div className="notification-dropdown">
-              <div className="notification-header">
-                <span>Notifications</span>
-                {notificationCount > 0 && (
-                  <span className="count">{notificationCount} pending</span>
-                )}
-              </div>
-              <div className="notification-list">
-                {notificationCount === 0 ? (
-                  <div className="notification-empty">
-                    All caught up
-                  </div>
-                ) : (
-                  notifications.map((approval, idx) => (
-                    <div key={idx} className="notification-item">
-                      <span className="notification-icon">🚀</span>
-                      <div className="notification-content">
-                        <div className="notification-title">
-                          Production Approval Required
-                        </div>
-                        <div className="notification-detail">
-                          {approval.customer} - {approval.deployment}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Create Menu */}
+        {/* Create Button - Next to Search */}
         <div className="create-menu-container">
           <button 
             className="create-btn"
@@ -184,6 +132,52 @@ function TopNavbar({ onCreateNew, selectedEnvironment, onEnvironmentChange }) {
           )}
         </div>
 
+        {/* Notifications */}
+        <div className="navbar-notifications">
+          <button 
+            className="icon-btn"
+            onClick={() => setShowNotifications(!showNotifications)}
+            title="Notifications"
+          >
+            🔔
+            {notificationCount > 0 && (
+              <span className="notification-badge">{notificationCount}</span>
+            )}
+          </button>
+          
+          {showNotifications && (
+            <div className="notification-dropdown">
+              <div className="notification-header">
+                <span>Notifications</span>
+                {notificationCount > 0 && (
+                  <span className="count">{notificationCount} pending</span>
+                )}
+              </div>
+              <div className="notification-list">
+                {notificationCount === 0 ? (
+                  <div className="notification-empty">
+                    All caught up
+                  </div>
+                ) : (
+                  notifications.map((approval, idx) => (
+                    <div key={idx} className="notification-item">
+                      <span className="notification-icon">🚀</span>
+                      <div className="notification-content">
+                        <div className="notification-title">
+                          Production Approval Required
+                        </div>
+                        <div className="notification-detail">
+                          {approval.customer} - {approval.deployment}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Quick Links */}
         <a 
           href="http://argocd.local" 
@@ -204,13 +198,49 @@ function TopNavbar({ onCreateNew, selectedEnvironment, onEnvironmentChange }) {
           📦
         </a>
 
-        {/* User Profile */}
-        <div className="navbar-user">
-          <div className="user-avatar">⚔️</div>
-          <div className="user-info">
-            <span className="user-name">Captain LeBrick</span>
-            <span className="user-role">Straw Hat Crew</span>
+        {/* User Profile with Login/Logout */}
+        <div className="navbar-user-container">
+          <div 
+            className="navbar-user"
+            onClick={() => setShowUserMenu(!showUserMenu)}
+          >
+            <div className="user-avatar">⚔️</div>
+            <div className="user-info">
+              <span className="user-name">Captain LeBrick</span>
+              <span className="user-role">Straw Hat Crew</span>
+            </div>
           </div>
+
+          {showUserMenu && (
+            <div className="user-menu">
+              <div className="user-menu-header">
+                <div className="user-avatar-large">⚔️</div>
+                <div>
+                  <div className="user-menu-name">Captain LeBrick</div>
+                  <div className="user-menu-role">Straw Hat Crew</div>
+                </div>
+              </div>
+              <div className="user-menu-items">
+                <button className="user-menu-item">
+                  <span className="menu-icon">👤</span>
+                  Profile Settings
+                </button>
+                <button className="user-menu-item">
+                  <span className="menu-icon">🔑</span>
+                  Change Password
+                </button>
+                <button className="user-menu-item">
+                  <span className="menu-icon">⚙️</span>
+                  Preferences
+                </button>
+                <div className="user-menu-divider"></div>
+                <button className="user-menu-item logout-item">
+                  <span className="menu-icon">🚪</span>
+                  Logout
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </nav>
