@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import './DeploymentDetails.css'
 import PipelineView from './PipelineView'
+import LogViewer from './LogViewer'
 
 function DeploymentDetails({ deploymentId, onClose }) {
   const [details, setDetails] = useState(null)
@@ -66,14 +67,29 @@ function DeploymentDetails({ deploymentId, onClose }) {
     <div className="deployment-details-modal" onClick={onClose}>
       <div className="deployment-details-content" onClick={(e) => e.stopPropagation()}>
         <div className="details-header">
-          <div>
-            <h2>
-              {deployment.name}
-              <span className="namespace-badge">{deployment.namespace}</span>
-            </h2>
-            <p className="image-info">
-              <strong>Image:</strong> {image}
-            </p>
+          <div className="header-content-section">
+            <div className="deployment-title-section">
+              <h2>{deployment.name}</h2>
+              <div className="deployment-meta-badges">
+                <span className="meta-badge namespace-badge">{deployment.namespace}</span>
+                <span className={`meta-badge env-badge env-${deployment.namespace.split('-').pop()}`}>
+                  {deployment.namespace.split('-').pop()?.toUpperCase()}
+                </span>
+                <span className={`meta-badge status-badge status-${deployment.replicas.ready === deployment.replicas.desired ? 'healthy' : 'warning'}`}>
+                  {deployment.replicas.ready}/{deployment.replicas.desired} Ready
+                </span>
+              </div>
+            </div>
+            <div className="deployment-details-info">
+              <div className="info-item">
+                <span className="info-label">Customer:</span>
+                <span className="info-value">{deployment.namespace.split('-')[0]}</span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Image:</span>
+                <span className="info-value info-code">{image}</span>
+              </div>
+            </div>
           </div>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
@@ -264,29 +280,12 @@ function DeploymentDetails({ deploymentId, onClose }) {
           )}
 
           {activeTab === 'logs' && (
-            <div className="logs-tab">
-              {!selectedPod ? (
-                <div className="select-pod-message">
-                  Select a pod from the Pods tab to view logs
-                </div>
-              ) : (
-                <div className="logs-viewer">
-                  <div className="logs-header">
-                    <h4>Logs: {selectedPod}</h4>
-                    <button 
-                      className="btn-refresh"
-                      onClick={() => fetchPodLogs(selectedPod)}
-                      disabled={loadingLogs}
-                    >
-                      {loadingLogs ? 'Loading...' : '🔄 Refresh'}
-                    </button>
-                  </div>
-                  <pre className="logs-content">
-                    {loadingLogs ? 'Loading logs...' : podLogs}
-                  </pre>
-                </div>
-              )}
-            </div>
+            <LogViewer 
+              deploymentId={deploymentId}
+              deploymentName={deployment.name}
+              namespace={deployment.namespace}
+              customer={deployment.namespace.split('-')[0]}
+            />
           )}
 
           {activeTab === 'pipeline' && (
