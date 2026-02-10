@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useCustomer } from '../contexts/CustomerContext'
 import './ApplicationsTable.css'
 import DeploymentDetails from './DeploymentDetails'
 
-function ApplicationsTable({ selectedCustomer, selectedEnvironment }) {
+function ApplicationsTable({ selectedEnvironment }) {
+  const { activeCustomer } = useCustomer()
   const [deployments, setDeployments] = useState([])
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -89,7 +91,7 @@ function ApplicationsTable({ selectedCustomer, selectedEnvironment }) {
 
   // Filter deployments
   const filtered = deployments.filter(d => {
-    if (selectedCustomer && d.customer !== selectedCustomer) return false
+    if (activeCustomer && d.customer !== activeCustomer.id) return false
     if (selectedEnvironment !== 'all' && d.environment !== selectedEnvironment) return false
     return true
   })
