@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: lebrickbot
+  name: luffy
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -13,12 +13,13 @@ spec:
     targetRevision: main
     path: helm/lebrickbot
     helm:
+      releaseName: luffy
       valueFiles:
         - values.yaml
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: lebrickbot
+    namespace: luffy
 
   syncPolicy:
     automated:

@@ -5,7 +5,7 @@
 Apply the ArgoCD Application to your cluster:
 
 ```bash
-kubectl apply -f argocd/lebrickbot-application.yaml
+kubectl apply -f argocd/luffy-application.yaml
 ```
 
 This will:
@@ -35,5 +35,5 @@ This will:
 Force sync from ArgoCD UI or CLI:
 
 ```bash
-argocd app sync lebrickbot
+argocd app sync luffy
 ```
