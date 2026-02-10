@@ -4,6 +4,46 @@ import './IntegrationsDashboard.css'
 // Available integrations that can be added
 const availableIntegrations = [
   {
+    id: 'prometheus',
+    name: 'Prometheus',
+    icon: '🔥',
+    description: 'Metrics collection and monitoring',
+    configFields: [
+      { name: 'url', label: 'Prometheus URL', type: 'text', placeholder: 'http://prometheus:9090', required: true },
+      { name: 'basicAuth', label: 'Basic Auth (optional)', type: 'text', placeholder: 'username:password' }
+    ]
+  },
+  {
+    id: 'grafana',
+    name: 'Grafana',
+    icon: '📊',
+    description: 'Visualization and dashboards for metrics',
+    configFields: [
+      { name: 'url', label: 'Grafana URL', type: 'text', placeholder: 'http://grafana:3000', required: true },
+      { name: 'apiKey', label: 'API Key', type: 'password', required: true }
+    ]
+  },
+  {
+    id: 'alertmanager',
+    name: 'AlertManager',
+    icon: '🚨',
+    description: 'Alert routing and notifications',
+    configFields: [
+      { name: 'url', label: 'AlertManager URL', type: 'text', placeholder: 'http://alertmanager:9093', required: true }
+    ]
+  },
+  {
+    id: 'splunk',
+    name: 'Splunk',
+    icon: '🔍',
+    description: 'Log aggregation and analysis',
+    configFields: [
+      { name: 'url', label: 'Splunk URL', type: 'text', placeholder: 'https://splunk.example.com:8089', required: true },
+      { name: 'token', label: 'HEC Token', type: 'password', required: true },
+      { name: 'index', label: 'Index Name', type: 'text', placeholder: 'main' }
+    ]
+  },
+  {
     id: 'aws',
     name: 'AWS',
     icon: '☁️',

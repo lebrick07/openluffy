@@ -290,3 +290,152 @@ def get_integration_status(integration_id: str):
         }
     
     raise HTTPException(status_code=404, detail='Integration not found')
+
+# Deep deployment insights
+@app.get("/deployments/{deployment_id}/details")
+def get_deployment_details(deployment_id: str):
+    """Get deep insights into a specific deployment"""
+    if not k8s_available:
+        return {'error': 'K8s not available'}
+    
+    # Parse deployment_id (format: namespace-deploymentname)
+    parts = deployment_id.rsplit('-', 1)
+    if len(parts) < 2:
+        raise HTTPException(status_code=400, detail='Invalid deployment ID format')
+    
+    namespace = '-'.join(parts[:-1])
+    deployment_name = parts[-1]
+    
+    try:
+        # Get deployment details
+        deployment = apps_v1.read_namespaced_deployment(deployment_name, namespace)
+        
+        # Get pods for this deployment
+        label_key = list(deployment.spec.selector.match_labels.keys())[0]
+        label_value = deployment.spec.selector.match_labels[label_key]
+        pods = v1.list_namespaced_pod(
+            namespace,
+            label_selector=f"{label_key}={label_value}"
+        )
+        
+        # Get recent events
+        events = v1.list_namespaced_event(namespace)
+        deployment_events = []
+        for event in events.items[-20:]:  # Last 20 events
+            if deployment_name in str(event.involved_object.name):
+                deployment_events.append({
+                    'timestamp': event.last_timestamp.isoformat() if event.last_timestamp else str(event.first_timestamp),
+                    'type': event.type,
+                    'reason': event.reason,
+                    'message': event.message
+                })
+        
+        # Build pod details
+        pod_details = []
+        for pod in pods.items:
+            pod_info = {
+                'name': pod.metadata.name,
+                'status': pod.status.phase,
+                'ip': pod.status.pod_ip,
+                'node': pod.spec.node_name,
+                'restarts': sum(c.restart_count for c in (pod.status.container_statuses or [])),
+                'age': str(pod.metadata.creation_timestamp) if pod.metadata.creation_timestamp else None,
+                'containers': []
+            }
+            
+            # Container details
+            if pod.status.container_statuses:
+                for container in pod.status.container_statuses:
+                    pod_info['containers'].append({
+                        'name': container.name,
+                        'ready': container.ready,
+                        'restarts': container.restart_count,
+                        'image': container.image
+                    })
+            
+            pod_details.append(pod_info)
+        
+        return {
+            'deployment': {
+                'name': deployment.metadata.name,
+                'namespace': deployment.metadata.namespace,
+                'replicas': {
+                    'desired': deployment.spec.replicas,
+                    'current': deployment.status.replicas or 0,
+                    'ready': deployment.status.ready_replicas or 0,
+                    'available': deployment.status.available_replicas or 0,
+                    'unavailable': deployment.status.unavailable_replicas or 0
+                },
+                'strategy': deployment.spec.strategy.type if deployment.spec.strategy else 'Unknown',
+                'created': str(deployment.metadata.creation_timestamp) if deployment.metadata.creation_timestamp else None
+            },
+            'pods': pod_details,
+            'events': deployment_events[:10],  # Last 10 events
+            'image': deployment.spec.template.spec.containers[0].image if deployment.spec.template.spec.containers else None
+        }
+    except ApiException as e:
+        raise HTTPException(status_code=404, detail=f'Deployment not found: {str(e)}')
+
+@app.get("/deployments/{deployment_id}/pods/{pod_name}/logs")
+def get_pod_logs(deployment_id: str, pod_name: str, lines: int = 100, container: Optional[str] = None):
+    """Get logs from a specific pod"""
+    if not k8s_available:
+        return {'error': 'K8s not available'}
+    
+    parts = deployment_id.rsplit('-', 1)
+    namespace = '-'.join(parts[:-1])
+    
+    try:
+        logs = v1.read_namespaced_pod_log(
+            name=pod_name,
+            namespace=namespace,
+            tail_lines=lines,
+            container=container
+        )
+        
+        return {
+            'pod': pod_name,
+            'namespace': namespace,
+            'container': container or 'default',
+            'lines': lines,
+            'logs': logs
+        }
+    except ApiException as e:
+        raise HTTPException(status_code=404, detail=f'Pod logs not found: {str(e)}')
+
+@app.get("/deployments/{deployment_id}/events")
+def get_deployment_events(deployment_id: str, limit: int = 50):
+    """Get all events for a deployment"""
+    if not k8s_available:
+        return {'error': 'K8s not available'}
+    
+    parts = deployment_id.rsplit('-', 1)
+    namespace = '-'.join(parts[:-1])
+    deployment_name = parts[-1]
+    
+    try:
+        events = v1.list_namespaced_event(namespace)
+        
+        deployment_events = []
+        for event in events.items:
+            if deployment_name in str(event.involved_object.name):
+                deployment_events.append({
+                    'timestamp': str(event.last_timestamp if event.last_timestamp else event.first_timestamp),
+                    'type': event.type,
+                    'reason': event.reason,
+                    'message': event.message,
+                    'count': event.count,
+                    'object': event.involved_object.name
+                })
+        
+        # Sort by timestamp descending
+        deployment_events.sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        return {
+            'deployment': deployment_id,
+            'namespace': namespace,
+            'events': deployment_events[:limit],
+            'total': len(deployment_events)
+        }
+    except ApiException as e:
+        raise HTTPException(status_code=404, detail=f'Events not found: {str(e)}')
