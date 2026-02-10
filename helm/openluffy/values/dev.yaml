@@ -1,3 +1,6 @@
+# Development Environment
+namespace: openluffy-dev
+
 backend:
   image:
     repository: ghcr.io/lebrick07/openluffy-backend
@@ -21,7 +24,7 @@ frontend:
 ingress:
   enabled: true
   className: traefik
-  host: openluffy.local
+  host: dev.openluffy.local
   path: /
   pathType: Prefix
 

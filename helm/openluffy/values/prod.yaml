@@ -1,3 +1,6 @@
+# Production Environment
+namespace: openluffy-prod
+
 backend:
   image:
     repository: ghcr.io/lebrick07/openluffy-backend

@@ -27,6 +27,22 @@ http://argocd.local
 - **Deployment:** ArgoCD + Helm on K3s
 - **AI Engine:** Claude-powered agent (coming soon)
 
+## Development
+
+**⚠️ IMPORTANT:** Read [CONTRIBUTING.md](CONTRIBUTING.md) before making changes.
+
+**Never push directly to `main`.** All changes must go through feature branches and pull requests.
+
+```bash
+# Create feature branch
+git checkout -b feature/your-feature
+
+# Make changes, commit, push
+git push origin feature/your-feature
+
+# Create PR on GitHub
+```
+
 ## Repository
 
 https://github.com/lebrick07/openluffy
