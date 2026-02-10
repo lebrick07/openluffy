@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY backend/main.py .
+COPY backend/main.py backend/luffy_agent.py ./
 
 EXPOSE 8000
 
