@@ -118,7 +118,7 @@ resource "aws_iam_role_policy_attachment" "github_actions" {
   policy_arn = aws_iam_policy.github_actions.arn
 }
 
-# LeBrickBot Service Account Role (IRSA)
+# Luffy Service Account Role (IRSA)
 resource "aws_iam_role" "lebrickbot_service" {
   name = "${var.cluster_name}-lebrickbot-service-role"
 
@@ -142,10 +142,10 @@ resource "aws_iam_role" "lebrickbot_service" {
   tags = var.tags
 }
 
-# LeBrickBot Service Policy - AWS API Access
+# Luffy Service Policy - AWS API Access
 resource "aws_iam_policy" "lebrickbot_service" {
   name        = "${var.cluster_name}-lebrickbot-service-policy"
-  description = "Policy for LeBrickBot to provision AWS resources"
+  description = "Policy for Luffy to provision AWS resources"
 
   policy = jsonencode({
     Version = "2012-10-17"

@@ -1,6 +1,6 @@
-# LeBrickBot Infrastructure - Terraform
+# Luffy Infrastructure - Terraform
 
-Production-ready infrastructure as code for deploying LeBrickBot to AWS EKS.
+Production-ready infrastructure as code for deploying Luffy to AWS EKS.
 
 ## Architecture
 
@@ -37,7 +37,7 @@ Production-ready infrastructure as code for deploying LeBrickBot to AWS EKS.
 
 ### IAM
 - **GitHub Actions role** - OIDC-based authentication for CI/CD
-- **LeBrickBot service role** - ReadOnly AWS API access via IRSA
+- **Luffy service role** - ReadOnly AWS API access via IRSA
 - Least-privilege policies for each component
 
 ## Prerequisites
@@ -91,7 +91,7 @@ kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/st
 kubectl create namespace argo-rollouts
 kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
 
-# Apply LeBrickBot Application
+# Apply Luffy Application
 kubectl apply -f ../../argocd/lebrickbot-application.yaml
 ```
 

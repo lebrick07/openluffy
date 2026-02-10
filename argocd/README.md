@@ -1,6 +1,6 @@
 # ArgoCD Setup
 
-## Deploy LeBrickBot Application
+## Deploy Luffy Application
 
 Apply the ArgoCD Application to your cluster:
 
@@ -9,7 +9,7 @@ kubectl apply -f argocd/lebrickbot-application.yaml
 ```
 
 This will:
-- Deploy LeBrickBot from the Helm chart in `helm/lebrickbot/`
+- Deploy Luffy from the Helm chart in `helm/lebrickbot/`
 - Watch the `main` branch for changes
 - Auto-sync on git pushes (automated GitOps)
 - Self-heal if resources drift from desired state

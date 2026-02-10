@@ -126,7 +126,7 @@ output "github_actions_role_arn" {
 }
 
 output "lebrickbot_service_role_arn" {
-  description = "ARN for LeBrickBot service role"
+  description = "ARN for Luffy service role"
   value       = module.iam.lebrickbot_service_role_arn
 }
 
