@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useCustomer } from '../contexts/CustomerContext'
 import './K8sInsights.css'
 import DeploymentDetails from './DeploymentDetails'
 
-function K8sInsights({ selectedCustomer: propSelectedCustomer }) {
+function K8sInsights() {
+  const { activeCustomer } = useCustomer()
   const [deployments, setDeployments] = useState([])
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -37,7 +39,7 @@ function K8sInsights({ selectedCustomer: propSelectedCustomer }) {
   }
 
   const filteredDeployments = deployments.filter(d => {
-    if (propSelectedCustomer && d.customer !== propSelectedCustomer) return false
+    if (activeCustomer && d.customer !== activeCustomer.id) return false
     if (filterCustomer !== 'all' && d.customer !== filterCustomer) return false
     if (filterEnvironment !== 'all' && d.environment !== filterEnvironment) return false
     if (filterStatus !== 'all' && d.status !== filterStatus) return false

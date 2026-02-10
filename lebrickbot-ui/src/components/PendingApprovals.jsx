@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useCustomer } from '../contexts/CustomerContext'
 import './PendingApprovals.css'
 import DeploymentProgress from './DeploymentProgress'
 
-function PendingApprovals({ selectedCustomer }) {
+function PendingApprovals() {
+  const { activeCustomer } = useCustomer()
   const [approvals, setApprovals] = useState([])
   const [loading, setLoading] = useState(true)
   const [promoting, setPromoting] = useState(null)
@@ -68,8 +70,8 @@ function PendingApprovals({ selectedCustomer }) {
     )
   }
 
-  const filteredApprovals = selectedCustomer
-    ? approvals.filter(a => a.customer_id === selectedCustomer)
+  const filteredApprovals = activeCustomer
+    ? approvals.filter(a => a.customer_id === activeCustomer.id)
     : approvals
 
   if (filteredApprovals.length === 0) {
