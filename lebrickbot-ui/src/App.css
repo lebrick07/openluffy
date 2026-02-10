@@ -24,12 +24,69 @@ body {
 .app-body {
   display: flex;
   flex: 1;
+  overflow: hidden;
+}
+
+/* Split Screen Layout */
+.split-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.split-top {
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #0d1117;
+}
+
+.split-bottom {
+  overflow: hidden;
+  background: #0d1117;
+}
+
+.split-divider {
+  height: 8px;
+  background: #161b22;
+  border-top: 1px solid #30363d;
+  border-bottom: 1px solid #30363d;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  position: relative;
+  z-index: 100;
+  transition: background 0.15s;
+}
+
+.split-divider:hover,
+.split-divider.dragging {
+  background: #21262d;
+}
+
+.split-divider-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7d8590;
+  font-size: 0.625rem;
+  letter-spacing: 2px;
+  user-select: none;
+}
+
+.split-divider.dragging {
+  background: #30363d;
+}
+
+.split-divider.dragging .split-divider-handle {
+  color: #c9d1d9;
 }
 
 .app-main {
   flex: 1;
   background: #0d1117;
-  min-height: calc(100vh - 52px);
 }
 
 .app-content {

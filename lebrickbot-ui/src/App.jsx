@@ -16,8 +16,9 @@ function App() {
   const [activeView, setActiveView] = useState('applications')
   const [selectedEnvironment, setSelectedEnvironment] = useState('all')
   const [showCreateModal, setShowCreateModal] = useState(null) // null | 'customer' | 'application' | 'pipeline' | 'integration'
-  const [aiChatOpen, setAIChatOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false) // Mobile sidebar state
+  const [splitPosition, setSplitPosition] = useState(50) // Split position percentage
+  const [isDragging, setIsDragging] = useState(false)
 
   const handleCreateNew = (type) => {
     setShowCreateModal(type)
@@ -33,6 +34,23 @@ function App() {
 
   const closeSidebar = () => {
     setSidebarOpen(false)
+  }
+
+  const handleMouseDown = () => {
+    setIsDragging(true)
+  }
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return
+    const windowHeight = window.innerHeight - 52 // Subtract navbar height
+    const newPosition = ((e.clientY - 52) / windowHeight) * 100
+    if (newPosition >= 20 && newPosition <= 80) {
+      setSplitPosition(newPosition)
+    }
+  }
+
+  const handleMouseUp = () => {
+    setIsDragging(false)
   }
 
   const renderView = () => {
@@ -98,7 +116,12 @@ function App() {
 
   return (
     <CustomerProvider>
-      <div className="app operator-grade">
+      <div 
+        className="app operator-grade" 
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
         <TopNavbar 
           onCreateNew={handleCreateNew}
           selectedEnvironment={selectedEnvironment}
@@ -115,11 +138,31 @@ function App() {
             isOpen={sidebarOpen}
           />
           {sidebarOpen && <div className="sidebar-overlay" onClick={closeSidebar}></div>}
-          <main className="app-main">
-            <div className="app-content">
-              {renderView()}
+          
+          {/* Split Screen Layout */}
+          <div className="split-container">
+            {/* Top: Dashboard */}
+            <main className="app-main split-top" style={{ height: `${splitPosition}%` }}>
+              <div className="app-content">
+                {renderView()}
+              </div>
+            </main>
+
+            {/* Draggable Divider */}
+            <div 
+              className={`split-divider ${isDragging ? 'dragging' : ''}`}
+              onMouseDown={handleMouseDown}
+            >
+              <div className="split-divider-handle">
+                <span>⋮⋮⋮</span>
+              </div>
             </div>
-          </main>
+
+            {/* Bottom: Luffy Chat (Always Visible) */}
+            <div className="split-bottom" style={{ height: `${100 - splitPosition}%` }}>
+              <AIChatPanel isOpen={true} />
+            </div>
+          </div>
         </div>
 
         {/* Create Modals */}
@@ -171,12 +214,6 @@ function App() {
             </div>
           </div>
         )}
-
-        {/* AI Chat Panel - Always Available */}
-        <AIChatPanel 
-          isOpen={aiChatOpen}
-          onToggle={() => setAIChatOpen(!aiChatOpen)}
-        />
       </div>
     </CustomerProvider>
   )
