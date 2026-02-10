@@ -9,7 +9,7 @@ import httpx
 from datetime import datetime
 from triage import triage_engine
 
-app = FastAPI(title="lebrickbot")
+app = FastAPI(title="openluffy")
 
 # In-memory storage for integration configs (TODO: move to K8s secrets or Vault)
 integrations_store: Dict[str, Dict[str, Any]] = {}
@@ -39,12 +39,12 @@ def healthz():
 
 @app.get("/")
 def root():
-    return {"service": "lebrickbot", "status": "running", "version": "0.1.0"}
+    return {"service": "openluffy", "status": "running", "version": "0.1.0"}
 
 @app.get("/status")
 def api_status():
     return {
-        "service": "lebrickbot-backend",
+        "service": "openluffy-backend",
         "status": "operational",
         "version": "0.1.0",
         "k8s": k8s_available
@@ -454,7 +454,7 @@ def get_integrations():
         'status': 'connected',
         'statusText': 'Connected',
         'metrics': {
-            'Repository': 'lebrick07/lebrickbot',
+            'Repository': 'lebrick07/openluffy',
             'Status': 'Active'
         }
     })

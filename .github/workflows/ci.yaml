@@ -85,8 +85,8 @@ jobs:
       - name: Build and push frontend
         uses: docker/build-push-action@v5
         with:
-          context: ./lebrickbot-ui
-          file: ./lebrickbot-ui/Dockerfile
+          context: ./openluffy-ui
+          file: ./openluffy-ui/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -109,12 +109,12 @@ jobs:
       - name: Update image tags in Helm values
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          sed -i "s|tag:.*|tag: main-${SHORT_SHA}|g" helm/lebrickbot/values.yaml
+          sed -i "s|tag:.*|tag: main-${SHORT_SHA}|g" helm/openluffy/values.yaml
           
       - name: Commit and push changes
         run: |
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'actions@github.com'
-          git add helm/lebrickbot/values.yaml
+          git add helm/openluffy/values.yaml
           git diff --staged --quiet || git commit -m "chore: update image tags to ${{ github.sha }}"
           git push

@@ -1,9 +1,0 @@
-
-services:
-  backend:
-    build:
-      context: backend
-      dockerfile: Dockerfile
-    container_name: lebrickbot-backend
-    ports:
-      - "8000:8000"

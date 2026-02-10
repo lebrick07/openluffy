@@ -11,7 +11,7 @@ spec:
   source:
     repoURL: https://github.com/lebrick07/openluffy.git
     targetRevision: main
-    path: helm/lebrickbot
+    path: helm/openluffy
     helm:
       releaseName: luffy
       valueFiles:

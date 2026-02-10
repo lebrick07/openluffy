@@ -47,11 +47,11 @@ Production-ready infrastructure as code for deploying Luffy to AWS EKS.
 3. **S3 backend** for state:
    ```bash
    aws s3api create-bucket \
-     --bucket lebrickbot-terraform-state \
+     --bucket openluffy-terraform-state \
      --region us-east-1
 
    aws dynamodb create-table \
-     --table-name lebrickbot-terraform-locks \
+     --table-name openluffy-terraform-locks \
      --attribute-definitions AttributeName=LockID,AttributeType=S \
      --key-schema AttributeName=LockID,KeyType=HASH \
      --billing-mode PAY_PER_REQUEST
@@ -77,7 +77,7 @@ terraform apply tfplan
 ### Configure kubectl
 
 ```bash
-aws eks update-kubeconfig --name lebrickbot-prod --region us-east-1
+aws eks update-kubeconfig --name openluffy-prod --region us-east-1
 ```
 
 ### Bootstrap ArgoCD
@@ -92,7 +92,7 @@ kubectl create namespace argo-rollouts
 kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
 
 # Apply Luffy Application
-kubectl apply -f ../../argocd/lebrickbot-application.yaml
+kubectl apply -f ../../argocd/openluffy-application.yaml
 ```
 
 ## Cost Estimates
@@ -147,7 +147,7 @@ permissions:
 ```bash
 # From RDS snapshot
 aws rds restore-db-instance-from-db-snapshot \
-  --db-instance-identifier lebrickbot-prod-db-restored \
+  --db-instance-identifier openluffy-prod-db-restored \
   --db-snapshot-identifier <snapshot-id>
 ```
 
@@ -192,14 +192,14 @@ terraform destroy
 ### Can't authenticate to cluster
 ```bash
 aws sts get-caller-identity  # Verify AWS credentials
-aws eks update-kubeconfig --name lebrickbot-prod --region us-east-1
+aws eks update-kubeconfig --name openluffy-prod --region us-east-1
 ```
 
 ### Node group not scaling
 ```bash
 kubectl get nodes
 kubectl describe node <node-name>
-aws eks describe-nodegroup --cluster-name lebrickbot-prod --nodegroup-name <name>
+aws eks describe-nodegroup --cluster-name openluffy-prod --nodegroup-name <name>
 ```
 
 ### RDS connection issues
@@ -209,7 +209,7 @@ aws ec2 describe-security-groups --group-ids <rds-sg-id>
 
 # Test from pod
 kubectl run -it --rm debug --image=postgres:16 --restart=Never -- \
-  psql -h <rds-endpoint> -U lebrickbot -d lebrickbot
+  psql -h <rds-endpoint> -U openluffy -d openluffy
 ```
 
 ---

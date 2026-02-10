@@ -13,11 +13,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "lebrickbot-terraform-state"
+    bucket         = "openluffy-terraform-state"
     key            = "prod/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
-    dynamodb_table = "lebrickbot-terraform-locks"
+    dynamodb_table = "openluffy-terraform-locks"
   }
 }
 
@@ -27,7 +27,7 @@ provider "aws" {
   default_tags {
     tags = {
       Environment = "production"
-      Project     = "lebrickbot"
+      Project     = "openluffy"
       ManagedBy   = "terraform"
     }
   }
@@ -42,7 +42,7 @@ variable "aws_region" {
 variable "cluster_name" {
   description = "Name of the EKS cluster"
   type        = string
-  default     = "lebrickbot-prod"
+  default     = "openluffy-prod"
 }
 
 variable "availability_zones" {
@@ -106,7 +106,7 @@ module "iam" {
   cluster_name      = var.cluster_name
   oidc_provider_arn = module.eks.oidc_provider_arn
   oidc_provider_url = module.eks.oidc_provider_url
-  github_repo       = "lebrick07/lebrickbot"
+  github_repo       = "lebrick07/openluffy"
 }
 
 # Outputs
@@ -125,9 +125,9 @@ output "github_actions_role_arn" {
   value       = module.iam.github_actions_role_arn
 }
 
-output "lebrickbot_service_role_arn" {
+output "openluffy_service_role_arn" {
   description = "ARN for Luffy service role"
-  value       = module.iam.lebrickbot_service_role_arn
+  value       = module.iam.openluffy_service_role_arn
 }
 
 output "database_endpoint" {

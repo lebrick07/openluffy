@@ -193,7 +193,7 @@ function OperatorNavbar({
           🐙
         </a>
         <a 
-          href="https://github.com/lebrick07/lebrickbot" 
+          href="https://github.com/lebrick07/openluffy" 
           target="_blank" 
           rel="noopener noreferrer"
           className="icon-btn"

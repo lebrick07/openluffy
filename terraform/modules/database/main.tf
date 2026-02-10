@@ -28,13 +28,13 @@ variable "allocated_storage" {
 variable "database_name" {
   description = "Initial database name"
   type        = string
-  default     = "lebrickbot"
+  default     = "openluffy"
 }
 
 variable "master_username" {
   description = "Master username"
   type        = string
-  default     = "lebrickbot"
+  default     = "openluffy"
 }
 
 variable "tags" {

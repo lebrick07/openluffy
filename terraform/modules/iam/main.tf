@@ -16,7 +16,7 @@ variable "oidc_provider_url" {
 variable "github_repo" {
   description = "GitHub repository (org/repo)"
   type        = string
-  default     = "lebrick07/lebrickbot"
+  default     = "lebrick07/openluffy"
 }
 
 variable "tags" {
@@ -119,8 +119,8 @@ resource "aws_iam_role_policy_attachment" "github_actions" {
 }
 
 # Luffy Service Account Role (IRSA)
-resource "aws_iam_role" "lebrickbot_service" {
-  name = "${var.cluster_name}-lebrickbot-service-role"
+resource "aws_iam_role" "openluffy_service" {
+  name = "${var.cluster_name}-openluffy-service-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -132,7 +132,7 @@ resource "aws_iam_role" "lebrickbot_service" {
       Action = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringEquals = {
-          "${var.oidc_provider_url}:sub" = "system:serviceaccount:lebrickbot:lebrickbot-backend"
+          "${var.oidc_provider_url}:sub" = "system:serviceaccount:openluffy:openluffy-backend"
           "${var.oidc_provider_url}:aud" = "sts.amazonaws.com"
         }
       }
@@ -143,8 +143,8 @@ resource "aws_iam_role" "lebrickbot_service" {
 }
 
 # Luffy Service Policy - AWS API Access
-resource "aws_iam_policy" "lebrickbot_service" {
-  name        = "${var.cluster_name}-lebrickbot-service-policy"
+resource "aws_iam_policy" "openluffy_service" {
+  name        = "${var.cluster_name}-openluffy-service-policy"
   description = "Policy for Luffy to provision AWS resources"
 
   policy = jsonencode({
@@ -171,15 +171,15 @@ resource "aws_iam_policy" "lebrickbot_service" {
   tags = var.tags
 }
 
-resource "aws_iam_role_policy_attachment" "lebrickbot_service" {
-  role       = aws_iam_role.lebrickbot_service.name
-  policy_arn = aws_iam_policy.lebrickbot_service.arn
+resource "aws_iam_role_policy_attachment" "openluffy_service" {
+  role       = aws_iam_role.openluffy_service.name
+  policy_arn = aws_iam_policy.openluffy_service.arn
 }
 
 output "github_actions_role_arn" {
   value = aws_iam_role.github_actions.arn
 }
 
-output "lebrickbot_service_role_arn" {
-  value = aws_iam_role.lebrickbot_service.arn
+output "openluffy_service_role_arn" {
+  value = aws_iam_role.openluffy_service.arn
 }

@@ -236,11 +236,11 @@ function IntegrationsDashboard() {
         status: 'connected',
         statusText: 'Connected',
         metrics: {
-          'Repository': 'lebrick07/lebrickbot',
+          'Repository': 'lebrick07/openluffy',
           'Status': 'Ready to query'
         },
         actions: ['View Repo', 'Workflows', 'Configure'],
-        url: 'https://github.com/lebrick07/lebrickbot'
+        url: 'https://github.com/lebrick07/openluffy'
       }
     } catch (error) {
       return null
