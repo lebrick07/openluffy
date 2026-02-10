@@ -977,3 +977,57 @@ async def create_customer(customer_data: CustomerCreate):
             {"step": "setup_ingress", "status": "pending"}
         ]
     }
+
+# ==================== LUFFY AI AGENT ====================
+from luffy_agent import luffy
+
+class LuffyChatRequest(BaseModel):
+    message: str
+    context: Optional[Dict[str, Any]] = None
+    history: Optional[List[Dict[str, str]]] = None
+
+class LuffyActionRequest(BaseModel):
+    action: str
+    context: Optional[Dict[str, Any]] = None
+
+@app.post("/api/luffy/chat")
+async def luffy_chat(request: LuffyChatRequest):
+    """
+    Chat with Luffy - the AI Super DevOps Engineer
+    """
+    result = await luffy.chat(
+        message=request.message,
+        context=request.context,
+        history=request.history
+    )
+    return result
+
+@app.post("/api/luffy/action")
+async def luffy_action(request: LuffyActionRequest):
+    """
+    Execute an action proposed by Luffy
+    """
+    result = await luffy.execute_action(
+        action=request.action,
+        context=request.context
+    )
+    return result
+
+@app.get("/api/luffy/status")
+def luffy_status():
+    """
+    Get Luffy's current status
+    """
+    return {
+        "name": "Luffy",
+        "role": "AI Super DevOps Engineer",
+        "status": "active",
+        "capabilities": [
+            "Autonomous infrastructure management",
+            "Pipeline generation and fixing",
+            "Deployment automation",
+            "Issue diagnosis and resolution",
+            "Cost optimization",
+            "Security scanning"
+        ]
+    }

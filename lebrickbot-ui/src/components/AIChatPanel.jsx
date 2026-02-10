@@ -32,18 +32,38 @@ function AIChatPanel({ isOpen, onToggle }) {
     setIsLoading(true)
 
     try {
-      // TODO: Replace with actual AI API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Build context for Luffy
+      const context = {
+        customer: activeCustomer ? activeCustomer.id : null,
+        environment: 'all', // TODO: Get from global state
+        resource_type: null,
+        resource_name: null
+      }
+
+      // Send to Luffy
+      const response = await fetch('/api/luffy/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: inputValue,
+          context: context,
+          history: messages.map(m => ({
+            role: m.role,
+            content: m.content
+          }))
+        })
+      })
+
+      if (!response.ok) throw new Error('Luffy request failed')
+
+      const data = await response.json()
 
       const aiMessage = {
         id: Date.now() + 1,
         role: 'assistant',
-        content: `I received your message: "${inputValue}"\n\nThis is a placeholder response. The AI backend integration is coming soon.`,
+        content: data.content,
         timestamp: new Date(),
-        actions: [
-          { label: 'Apply Fix', action: 'apply-fix' },
-          { label: 'Show Logs', action: 'show-logs' }
-        ]
+        actions: data.actions || []
       }
 
       setMessages(prev => [...prev, aiMessage])
@@ -60,9 +80,46 @@ function AIChatPanel({ isOpen, onToggle }) {
     }
   }
 
-  const handleAction = (action) => {
+  const handleAction = async (action) => {
     console.log('Action triggered:', action)
-    // TODO: Implement action handlers
+    
+    // Build context
+    const context = {
+      customer: activeCustomer ? activeCustomer.id : null,
+      environment: 'all',
+      resource_type: null,
+      resource_name: null
+    }
+
+    try {
+      const response = await fetch('/api/luffy/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, context })
+      })
+
+      if (!response.ok) throw new Error('Action failed')
+
+      const result = await response.json()
+
+      // Add action result to messages
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        role: 'system',
+        content: result.success 
+          ? `✓ ${result.message}` 
+          : `✗ ${result.message}`,
+        timestamp: new Date()
+      }])
+    } catch (error) {
+      console.error('Action failed:', error)
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        role: 'error',
+        content: 'Action execution failed. Please try again.',
+        timestamp: new Date()
+      }])
+    }
   }
 
   const getContextString = () => {
@@ -86,7 +143,7 @@ function AIChatPanel({ isOpen, onToggle }) {
         <div className="ai-header-left">
           <span className="ai-icon">🤖</span>
           <div>
-            <h3>AI DevOps Assistant</h3>
+            <h3>Luffy – AI DevOps Engineer</h3>
             <span className="ai-context">{getContextString()}</span>
           </div>
         </div>
