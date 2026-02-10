@@ -2,6 +2,7 @@ import { useState } from 'react'
 import './App.css'
 import Sidebar from './components/Sidebar'
 import CustomerSelector from './components/CustomerSelector'
+import CompactDashboard from './components/CompactDashboard'
 import CustomerDeploymentsView from './components/CustomerDeploymentsView'
 import PendingApprovals from './components/PendingApprovals'
 import IntegrationsDashboard from './components/IntegrationsDashboard'
@@ -16,12 +17,7 @@ function App() {
   const renderView = () => {
     switch (activeView) {
       case 'dashboard':
-        return (
-          <>
-            <PendingApprovals selectedCustomer={selectedCustomer} />
-            <CustomerDeploymentsView selectedCustomer={selectedCustomer} />
-          </>
-        )
+        return <CompactDashboard selectedCustomer={selectedCustomer} />
       case 'k8s':
         return <K8sInsights selectedCustomer={selectedCustomer} />
       case 'pipelines':
