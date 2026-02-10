@@ -24,24 +24,23 @@ body {
 .app-body {
   display: flex;
   flex: 1;
-  padding-top: 60px; /* Height of TopNavbar */
 }
 
 .app-main {
   flex: 1;
-  margin-left: 280px;
+  margin-left: 220px;
   transition: margin-left 0.3s ease;
   background: #0d1117;
-  min-height: calc(100vh - 60px);
+  min-height: calc(100vh - 52px);
 }
 
 .app-content {
-  padding: 1rem;
+  padding: 0.75rem;
 }
 
 /* When sidebar is collapsed */
 .app:has(.sidebar.collapsed) .app-main {
-  margin-left: 70px;
+  margin-left: 56px;
 }
 
 .view-container {

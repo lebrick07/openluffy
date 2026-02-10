@@ -36,15 +36,9 @@ function TopNavbar({ onCreateNew, selectedEnvironment, onEnvironmentChange }) {
 
   return (
     <nav className="top-navbar">
-      {/* Left Section: Brand + Filters */}
+      {/* Left Section: Icon + Filters */}
       <div className="navbar-left">
-        <div className="navbar-brand">
-          <span className="brand-icon">🏴‍☠️</span>
-          <div className="brand-text">
-            <span className="brand-name">Luffy</span>
-            <span className="brand-subtitle">Straw Hat DevOps</span>
-          </div>
-        </div>
+        <span className="navbar-icon">🏴‍☠️</span>
 
         <div className="navbar-filters">
           <select 
@@ -69,26 +63,24 @@ function TopNavbar({ onCreateNew, selectedEnvironment, onEnvironmentChange }) {
             <option value="prod">PROD</option>
           </select>
         </div>
-
-        <div className="navbar-search-container">
-          <input 
-            type="text"
-            placeholder="Search customers, apps, pipelines..."
-            className="navbar-search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
       </div>
 
-      {/* Right Section: Status + Actions */}
+      {/* Center Section: Global Search (Priority) */}
+      <div className="navbar-center">
+        <input 
+          type="text"
+          placeholder="Search customers, apps, pipelines, logs..."
+          className="navbar-search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
+      {/* Right Section: Compact Actions */}
       <div className="navbar-right">
-        {/* System Status */}
-        <div className={`status-indicator ${systemStatus.healthy ? 'healthy' : 'unhealthy'}`}>
+        {/* System Status - Compact */}
+        <div className={`status-indicator ${systemStatus.healthy ? 'healthy' : 'unhealthy'}`} title={systemStatus.loading ? 'Checking...' : systemStatus.healthy ? 'All Systems Operational' : 'System Issues Detected'}>
           <span className="status-dot"></span>
-          <span className="status-text">
-            {systemStatus.loading ? 'Checking...' : systemStatus.healthy ? 'All Systems Operational' : 'System Issues Detected'}
-          </span>
         </div>
 
         {/* Notifications */}
