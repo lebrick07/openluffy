@@ -104,3 +104,22 @@ body {
     font-size: 1.25rem;
   }
 }
+
+/* Sidebar Overlay (Mobile) */
+.sidebar-overlay {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    top: 52px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(1, 4, 9, 0.7);
+    z-index: 997;
+    backdrop-filter: blur(2px);
+  }
+}

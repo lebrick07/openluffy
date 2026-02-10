@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import './Sidebar.css'
 
-function Sidebar({ activeView, onViewChange }) {
+function Sidebar({ activeView, onViewChange, isOpen = false }) {
   const [collapsed, setCollapsed] = useState(false)
 
   const menuItems = [
@@ -56,7 +56,7 @@ function Sidebar({ activeView, onViewChange }) {
   ]
 
   return (
-    <div className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
+    <div className={`sidebar ${collapsed ? 'collapsed' : ''} ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-header">
         {!collapsed ? (
           <span className="sidebar-brand">Luffy DevOps</span>

@@ -17,6 +17,7 @@ function App() {
   const [selectedEnvironment, setSelectedEnvironment] = useState('all')
   const [showCreateModal, setShowCreateModal] = useState(null) // null | 'customer' | 'application' | 'pipeline' | 'integration'
   const [aiChatOpen, setAIChatOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false) // Mobile sidebar state
 
   const handleCreateNew = (type) => {
     setShowCreateModal(type)
@@ -24,6 +25,14 @@ function App() {
 
   const handleCreated = () => {
     setShowCreateModal(null)
+  }
+
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen)
+  }
+
+  const closeSidebar = () => {
+    setSidebarOpen(false)
   }
 
   const renderView = () => {
@@ -94,9 +103,18 @@ function App() {
           onCreateNew={handleCreateNew}
           selectedEnvironment={selectedEnvironment}
           onEnvironmentChange={setSelectedEnvironment}
+          onToggleSidebar={toggleSidebar}
         />
         <div className="app-body">
-          <Sidebar activeView={activeView} onViewChange={setActiveView} />
+          <Sidebar 
+            activeView={activeView} 
+            onViewChange={(view) => {
+              setActiveView(view)
+              closeSidebar() // Close sidebar on mobile when selecting a view
+            }}
+            isOpen={sidebarOpen}
+          />
+          {sidebarOpen && <div className="sidebar-overlay" onClick={closeSidebar}></div>}
           <main className="app-main">
             <div className="app-content">
               {renderView()}

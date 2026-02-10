@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useCustomer } from '../contexts/CustomerContext'
 import './TopNavbar.css'
 
-function TopNavbar({ onCreateNew, selectedEnvironment, onEnvironmentChange }) {
+function TopNavbar({ onCreateNew, selectedEnvironment, onEnvironmentChange, onToggleSidebar }) {
   const { customers, selectedCustomer, selectCustomer } = useCustomer()
   const [systemStatus, setSystemStatus] = useState({ healthy: true, loading: true })
   const [notifications, setNotifications] = useState([])
@@ -37,6 +37,13 @@ function TopNavbar({ onCreateNew, selectedEnvironment, onEnvironmentChange }) {
 
   return (
     <nav className="top-navbar">
+      {/* Hamburger Menu (Mobile Only) */}
+      <button className="hamburger-btn" onClick={onToggleSidebar} title="Toggle menu">
+        <span className="hamburger-line"></span>
+        <span className="hamburger-line"></span>
+        <span className="hamburger-line"></span>
+      </button>
+
       {/* Left Section: Filters */}
       <div className="navbar-left">
         <div className="navbar-filters">
