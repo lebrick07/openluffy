@@ -1,0 +1,35 @@
+# Development Environment
+namespace: openluffy-dev
+
+backend:
+  image:
+    repository: ghcr.io/lebrick07/openluffy-backend
+    tag: latest # backend
+    pullPolicy: Never
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 8000
+
+frontend:
+  image:
+    repository: ghcr.io/lebrick07/openluffy-frontend
+    tag: latest # frontend
+    pullPolicy: Never
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 80
+
+ingress:
+  enabled: true
+  className: traefik
+  host: dev.openluffy.local
+  path: /
+  pathType: Prefix
+
+github:
+  enabled: true
+
+aws:
+  roleArn: ""

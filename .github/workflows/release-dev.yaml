@@ -1,0 +1,146 @@
+name: Release - Dev
+
+# Runs on merge to develop branch
+on:
+  push:
+    branches: [develop]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Build and push dev images
+  build-and-push:
+    name: Build & Push Dev Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (backend)
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
+          tags: |
+            type=sha,prefix=dev-
+            type=raw,value=dev-latest
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata (frontend)
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend
+          tags: |
+            type=sha,prefix=dev-
+            type=raw,value=dev-latest
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./openluffy-ui/Dockerfile
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Update dev manifests
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "Updating dev environment with tag: dev-${SHORT_SHA}"
+          
+          # Update dev values
+          sed -i "s|tag:.*# backend|tag: dev-${SHORT_SHA} # backend|g" helm/openluffy/values/dev.yaml
+          sed -i "s|tag:.*# frontend|tag: dev-${SHORT_SHA} # frontend|g" helm/openluffy/values/dev.yaml
+          
+      - name: Commit dev manifest changes
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'actions@github.com'
+          git add helm/openluffy/values/dev.yaml
+          
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          git commit -m "chore(dev): update image tags to dev-${SHORT_SHA} [skip ci]" || echo "No changes"
+          git push
+
+  # Auto-promote to preprod after 30 seconds
+  promote-to-preprod:
+    name: Auto-Promote to Preprod
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Wait for dev deployment to stabilize
+        run: sleep 30
+
+      - name: Promote to preprod
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "Promoting dev-${SHORT_SHA} to preprod environment"
+          
+          # Copy dev image tags to preprod
+          sed -i "s|tag:.*# backend|tag: dev-${SHORT_SHA} # backend|g" helm/openluffy/values/preprod.yaml
+          sed -i "s|tag:.*# frontend|tag: dev-${SHORT_SHA} # frontend|g" helm/openluffy/values/preprod.yaml
+          
+      - name: Commit preprod manifest changes
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'actions@github.com'
+          git add helm/openluffy/values/preprod.yaml
+          
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          git commit -m "chore(preprod): auto-promote dev-${SHORT_SHA} [skip ci]" || echo "No changes"
+          git push
+
+  # Summary
+  release-complete:
+    name: Dev Release Complete
+    runs-on: ubuntu-latest
+    needs: [build-and-push, promote-to-preprod]
+    steps:
+      - name: Summary
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "🏴‍☠️ OpenLuffy Dev Release Complete"
+          echo ""
+          echo "✅ Images built: dev-${SHORT_SHA}"
+          echo "✅ Dev environment updated"
+          echo "✅ Auto-promoted to preprod"
+          echo ""
+          echo "Dev: http://dev.openluffy.local"
+          echo "Preprod: http://preprod.openluffy.local"
