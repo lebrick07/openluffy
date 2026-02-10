@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import './PendingApprovals.css'
+import DeploymentProgress from './DeploymentProgress'
 
 function PendingApprovals() {
   const [approvals, setApprovals] = useState([])
   const [loading, setLoading] = useState(true)
   const [promoting, setPromoting] = useState(null)
+  const [showProgress, setShowProgress] = useState(null)
 
   useEffect(() => {
     fetchApprovals()
@@ -39,18 +41,22 @@ function PendingApprovals() {
       
       if (!response.ok) throw new Error('Promotion failed')
       
-      const result = await response.json()
-      
-      alert(`✅ Production deployment initiated for ${customerId}!\n\nCheck ArgoCD for sync status: http://argocd.local`)
+      // Show progress modal
+      setShowProgress(customerId)
       
       // Refresh approvals list
-      fetchApprovals()
+      setTimeout(fetchApprovals, 2000)
     } catch (error) {
       console.error('Error promoting:', error)
       alert(`❌ Failed to promote ${customerId}: ${error.message}`)
     } finally {
       setPromoting(null)
     }
+  }
+
+  const handleProgressClose = () => {
+    setShowProgress(null)
+    fetchApprovals() // Refresh approvals when closing
   }
 
   if (loading) {
@@ -133,6 +139,13 @@ function PendingApprovals() {
           </div>
         ))}
       </div>
+
+      {showProgress && (
+        <DeploymentProgress 
+          customerId={showProgress}
+          onClose={handleProgressClose}
+        />
+      )}
     </div>
   )
 }
