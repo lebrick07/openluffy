@@ -1,0 +1,361 @@
+.pipeline-view {
+  padding: 1rem;
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+.pipeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e1e4e8;
+}
+
+.pipeline-info h4 {
+  margin: 0 0 0.5rem 0;
+  color: #24292e;
+  font-size: 1.1rem;
+}
+
+.pipeline-repo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.repo-icon {
+  font-size: 1rem;
+}
+
+.pipeline-repo a {
+  color: #0366d6;
+  text-decoration: none;
+}
+
+.pipeline-repo a:hover {
+  text-decoration: underline;
+}
+
+.pipeline-stats {
+  display: flex;
+  gap: 1rem;
+}
+
+.pipeline-stats .stat {
+  font-size: 0.85rem;
+  color: #586069;
+}
+
+.pipeline-stats .stat strong {
+  color: #24292e;
+  font-weight: 600;
+}
+
+.pipeline-runs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.no-runs {
+  text-align: center;
+  padding: 2rem;
+  color: #586069;
+  font-size: 0.9rem;
+}
+
+.pipeline-run {
+  background: #f6f8fa;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.pipeline-run:hover {
+  border-color: #0366d6;
+  box-shadow: 0 2px 8px rgba(3, 102, 214, 0.1);
+}
+
+.run-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: white;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.run-header:hover {
+  background: #f6f8fa;
+}
+
+.run-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.status-icon {
+  font-size: 1.5rem;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: bold;
+}
+
+.status-success .status-icon {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.status-failure .status-icon {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.status-cancelled .status-icon {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.status-running .status-icon {
+  background: #fef3c7;
+  color: #d97706;
+  animation: spin 1s linear infinite;
+}
+
+.status-queued .status-icon {
+  background: #e5e7eb;
+  color: #9ca3af;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.run-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.run-name {
+  font-weight: 600;
+  color: #24292e;
+  font-size: 0.95rem;
+}
+
+.run-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: #586069;
+}
+
+.run-branch {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: #f6f8fa;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+}
+
+.branch-icon {
+  font-size: 0.85rem;
+}
+
+.run-commit {
+  font-family: 'Courier New', monospace;
+  background: #f6f8fa;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+}
+
+.run-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.run-duration {
+  font-size: 0.85rem;
+  color: #586069;
+  font-weight: 500;
+}
+
+.run-link {
+  color: #0366d6;
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid #e1e4e8;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.run-link:hover {
+  background: #0366d6;
+  color: white;
+  border-color: #0366d6;
+}
+
+.run-commit-msg {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  color: #586069;
+  background: #f6f8fa;
+  border-top: 1px solid #e1e4e8;
+  font-style: italic;
+}
+
+.run-jobs {
+  padding: 1rem;
+  background: white;
+  border-top: 1px solid #e1e4e8;
+}
+
+.jobs-loading {
+  text-align: center;
+  padding: 1rem;
+  color: #586069;
+  font-size: 0.9rem;
+}
+
+.jobs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.job-item {
+  background: #f6f8fa;
+  border: 1px solid #e1e4e8;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.job-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: white;
+  border-bottom: 1px solid #e1e4e8;
+}
+
+.job-name {
+  flex: 1;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: #24292e;
+}
+
+.job-link {
+  color: #0366d6;
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 1.2rem;
+  padding: 0 0.5rem;
+}
+
+.job-link:hover {
+  color: #0256b8;
+}
+
+.job-steps {
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  background: white;
+  border-radius: 3px;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.step-item:hover {
+  background: #f6f8fa;
+}
+
+.step-number {
+  font-weight: 600;
+  color: #586069;
+  min-width: 1.5rem;
+  text-align: right;
+}
+
+.step-icon {
+  font-size: 1rem;
+}
+
+.step-item.status-success .step-icon {
+  color: #16a34a;
+}
+
+.step-item.status-failure .step-icon {
+  color: #dc2626;
+}
+
+.step-item.status-running .step-icon {
+  color: #d97706;
+}
+
+.step-item.status-queued .step-icon {
+  color: #9ca3af;
+}
+
+.step-name {
+  flex: 1;
+  color: #24292e;
+}
+
+.pipeline-loading,
+.pipeline-error {
+  text-align: center;
+  padding: 2rem;
+  color: #586069;
+}
+
+.pipeline-error {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+.link-github-actions {
+  color: #0366d6;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border: 1px solid #0366d6;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.link-github-actions:hover {
+  background: #0366d6;
+  color: white;
+}

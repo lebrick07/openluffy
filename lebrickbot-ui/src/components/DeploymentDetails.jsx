@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import './DeploymentDetails.css'
+import PipelineView from './PipelineView'
 
 function DeploymentDetails({ deploymentId, onClose }) {
   const [details, setDetails] = useState(null)
@@ -101,6 +102,12 @@ function DeploymentDetails({ deploymentId, onClose }) {
             onClick={() => setActiveTab('logs')}
           >
             Logs
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'pipeline' ? 'active' : ''}`}
+            onClick={() => setActiveTab('pipeline')}
+          >
+            Pipeline
           </button>
         </div>
 
@@ -280,6 +287,10 @@ function DeploymentDetails({ deploymentId, onClose }) {
                 </div>
               )}
             </div>
+          )}
+
+          {activeTab === 'pipeline' && (
+            <PipelineView deploymentId={deploymentId} />
           )}
         </div>
       </div>

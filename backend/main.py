@@ -3,8 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 from pydantic import BaseModel
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import os
+import httpx
+from datetime import datetime
 
 app = FastAPI(title="lebrickbot")
 
@@ -679,3 +681,162 @@ def get_pending_approvals():
         'approvals': pending,
         'total': len(pending)
     }
+
+# GitHub Actions Integration
+CUSTOMER_REPOS = {
+    'acme-corp': 'lebrick07/acme-corp-api',
+    'techstart': 'lebrick07/techstart-webapp',
+    'widgetco': 'lebrick07/widgetco-api'
+}
+
+@app.get("/deployments/{deployment_id}/pipeline")
+async def get_deployment_pipeline(deployment_id: str):
+    """Get GitHub Actions pipeline runs for a deployment"""
+    # Parse deployment_id (format: customer-env-app)
+    parts = deployment_id.split('-')
+    if len(parts) < 2:
+        raise HTTPException(status_code=400, detail="Invalid deployment ID")
+    
+    customer = '-'.join(parts[:-1]) if parts[-1] in ['dev', 'preprod', 'prod'] else parts[0]
+    environment = parts[-1] if parts[-1] in ['dev', 'preprod', 'prod'] else 'dev'
+    
+    # Get GitHub repo
+    repo = CUSTOMER_REPOS.get(customer)
+    if not repo:
+        return {'runs': [], 'total': 0, 'error': f'No repo mapping for {customer}'}
+    
+    # Fetch workflow runs from GitHub API
+    github_token = os.getenv('GITHUB_TOKEN', '')
+    headers = {
+        'Accept': 'application/vnd.github.v3+json'
+    }
+    if github_token:
+        headers['Authorization'] = f'token {github_token}'
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f'https://api.github.com/repos/{repo}/actions/runs',
+                headers=headers,
+                params={'per_page': 10, 'page': 1}
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                runs = []
+                
+                for run in data.get('workflow_runs', []):
+                    runs.append({
+                        'id': run['id'],
+                        'name': run['name'],
+                        'status': run['status'],
+                        'conclusion': run['conclusion'],
+                        'branch': run['head_branch'],
+                        'commit_sha': run['head_sha'][:7],
+                        'commit_message': run.get('head_commit', {}).get('message', '').split('\n')[0],
+                        'author': run.get('head_commit', {}).get('author', {}).get('name', 'Unknown'),
+                        'created_at': run['created_at'],
+                        'updated_at': run['updated_at'],
+                        'duration': None,  # Calculate if completed
+                        'url': run['html_url'],
+                        'jobs_url': run['jobs_url']
+                    })
+                    
+                    # Calculate duration for completed runs
+                    if run['status'] == 'completed' and run['created_at'] and run['updated_at']:
+                        try:
+                            created = datetime.fromisoformat(run['created_at'].replace('Z', '+00:00'))
+                            updated = datetime.fromisoformat(run['updated_at'].replace('Z', '+00:00'))
+                            duration_seconds = (updated - created).total_seconds()
+                            runs[-1]['duration'] = int(duration_seconds)
+                        except:
+                            pass
+                
+                return {
+                    'deployment_id': deployment_id,
+                    'customer': customer,
+                    'environment': environment,
+                    'repo': repo,
+                    'runs': runs,
+                    'total': len(runs)
+                }
+            else:
+                return {
+                    'runs': [],
+                    'total': 0,
+                    'error': f'GitHub API returned {response.status_code}'
+                }
+                
+    except Exception as e:
+        return {
+            'runs': [],
+            'total': 0,
+            'error': str(e)
+        }
+
+@app.get("/deployments/{deployment_id}/pipeline/{run_id}/jobs")
+async def get_pipeline_jobs(deployment_id: str, run_id: int):
+    """Get detailed jobs for a specific pipeline run"""
+    parts = deployment_id.split('-')
+    customer = '-'.join(parts[:-1]) if parts[-1] in ['dev', 'preprod', 'prod'] else parts[0]
+    
+    repo = CUSTOMER_REPOS.get(customer)
+    if not repo:
+        return {'jobs': [], 'error': f'No repo mapping for {customer}'}
+    
+    github_token = os.getenv('GITHUB_TOKEN', '')
+    headers = {
+        'Accept': 'application/vnd.github.v3+json'
+    }
+    if github_token:
+        headers['Authorization'] = f'token {github_token}'
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f'https://api.github.com/repos/{repo}/actions/runs/{run_id}/jobs',
+                headers=headers
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                jobs = []
+                
+                for job in data.get('jobs', []):
+                    steps = []
+                    for step in job.get('steps', []):
+                        steps.append({
+                            'name': step['name'],
+                            'status': step['status'],
+                            'conclusion': step.get('conclusion'),
+                            'number': step['number'],
+                            'started_at': step.get('started_at'),
+                            'completed_at': step.get('completed_at')
+                        })
+                    
+                    jobs.append({
+                        'id': job['id'],
+                        'name': job['name'],
+                        'status': job['status'],
+                        'conclusion': job.get('conclusion'),
+                        'started_at': job.get('started_at'),
+                        'completed_at': job.get('completed_at'),
+                        'steps': steps,
+                        'url': job['html_url']
+                    })
+                
+                return {
+                    'run_id': run_id,
+                    'jobs': jobs,
+                    'total': len(jobs)
+                }
+            else:
+                return {
+                    'jobs': [],
+                    'error': f'GitHub API returned {response.status_code}'
+                }
+    except Exception as e:
+        return {
+            'jobs': [],
+            'error': str(e)
+        }
