@@ -19,6 +19,8 @@ spec:
         component: backend
     spec:
       serviceAccountName: lebrickbot-backend
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: backend
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
@@ -30,6 +32,12 @@ spec:
           env:
             - name: AWS_ROLE_ARN
               value: {{ .Values.aws.roleArn | quote }}
+            - name: OPENCLAW_URL
+              value: "http://localhost:18789"
+            - name: OPENCLAW_SESSION
+              value: "main"
+            - name: OPENCLAW_TOKEN
+              value: ""
           livenessProbe:
             httpGet:
               path: /healthz
