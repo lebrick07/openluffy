@@ -439,3 +439,110 @@ def get_deployment_events(deployment_id: str, limit: int = 50):
         }
     except ApiException as e:
         raise HTTPException(status_code=404, detail=f'Events not found: {str(e)}')
+
+# Helper to parse deployment ID
+def parse_deployment_id(deployment_id: str):
+    """Parse deployment_id to extract namespace and deployment name
+    Format: {namespace}-{deployment-name}
+    Challenge: both can contain hyphens
+    
+    Solution: Look up in deployments list to get the actual mapping
+    """
+    # Get all deployments to find the match
+    if not k8s_available:
+        return None, None
+    
+    # Try to find the deployment in our list
+    customers = ['acme-corp', 'techstart', 'widgetco']
+    environments = ['dev', 'preprod', 'prod']
+    
+    for customer in customers:
+        for env in environments:
+            ns = f"{customer}-{env}"
+            try:
+                deploys = apps_v1.list_namespaced_deployment(ns)
+                for deploy in deploys.items:
+                    expected_id = f"{ns}-{deploy.metadata.name}"
+                    if expected_id == deployment_id:
+                        return ns, deploy.metadata.name
+            except:
+                continue
+    
+    return None, None
+
+@app.get("/deployments/{deployment_id}/details-v2")
+def get_deployment_details_v2(deployment_id: str):
+    """Get deep insights - improved version with better ID parsing"""
+    if not k8s_available:
+        return {'error': 'K8s not available'}
+    
+    namespace, deployment_name = parse_deployment_id(deployment_id)
+    
+    if not namespace or not deployment_name:
+        raise HTTPException(status_code=404, detail=f'Deployment not found: {deployment_id}')
+    
+    try:
+        # Get deployment details
+        deployment = apps_v1.read_namespaced_deployment(deployment_name, namespace)
+        
+        # Get pods
+        label_key = list(deployment.spec.selector.match_labels.keys())[0]
+        label_value = deployment.spec.selector.match_labels[label_key]
+        pods = v1.list_namespaced_pod(namespace, label_selector=f"{label_key}={label_value}")
+        
+        # Get events
+        events = v1.list_namespaced_event(namespace)
+        deployment_events = []
+        for event in events.items[-20:]:
+            if deployment_name in str(event.involved_object.name):
+                deployment_events.append({
+                    'timestamp': str(event.last_timestamp or event.first_timestamp),
+                    'type': event.type,
+                    'reason': event.reason,
+                    'message': event.message
+                })
+        
+        # Build pod details
+        pod_details = []
+        for pod in pods.items:
+            pod_info = {
+                'name': pod.metadata.name,
+                'status': pod.status.phase,
+                'ip': pod.status.pod_ip,
+                'node': pod.spec.node_name,
+                'restarts': sum(c.restart_count for c in (pod.status.container_statuses or [])),
+                'age': str(pod.metadata.creation_timestamp),
+                'containers': []
+            }
+            
+            if pod.status.container_statuses:
+                for container in pod.status.container_statuses:
+                    pod_info['containers'].append({
+                        'name': container.name,
+                        'ready': container.ready,
+                        'restarts': container.restart_count,
+                        'image': container.image
+                    })
+            
+            pod_details.append(pod_info)
+        
+        return {
+            'deployment': {
+                'id': deployment_id,
+                'name': deployment.metadata.name,
+                'namespace': deployment.metadata.namespace,
+                'replicas': {
+                    'desired': deployment.spec.replicas,
+                    'current': deployment.status.replicas or 0,
+                    'ready': deployment.status.ready_replicas or 0,
+                    'available': deployment.status.available_replicas or 0
+                },
+                'strategy': deployment.spec.strategy.type if deployment.spec.strategy else 'Unknown',
+                'created': str(deployment.metadata.creation_timestamp)
+            },
+            'pods': pod_details,
+            'events': deployment_events[:10],
+            'image': deployment.spec.template.spec.containers[0].image if deployment.spec.template.spec.containers else None
+        }
+    except ApiException as e:
+        raise HTTPException(status_code=404, detail=f'Error: {str(e)}')
