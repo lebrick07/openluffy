@@ -130,7 +130,12 @@ function K8sInsights() {
       <div className="deployments-grid">
         {filteredDeployments.length === 0 ? (
           <div className="no-results">
-            No deployments match the current filters
+            {!activeCustomer 
+              ? '👤 Select a customer from the dropdown to view their Kubernetes deployments'
+              : deployments.length === 0
+                ? `No Kubernetes deployments found for ${activeCustomer.name}`
+                : 'No deployments match the current filters'
+            }
           </div>
         ) : (
           filteredDeployments.map(deployment => (
