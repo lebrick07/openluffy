@@ -786,6 +786,22 @@ Visit: http://localhost:8080'''
                     capture_output=True
                 )
                 
+                # Create develop branch for dev/preprod deployments
+                subprocess.run(
+                    ['git', 'checkout', '-b', 'develop'],
+                    cwd=repo_path,
+                    check=True,
+                    capture_output=True
+                )
+                subprocess.run(
+                    ['git', 'push', 'origin', 'develop'],
+                    cwd=repo_path,
+                    check=True,
+                    capture_output=True
+                )
+                
+                result['branches_created'] = ['main', 'develop']
+                
             except subprocess.CalledProcessError as e:
                 result['errors'].append(f'Git operation failed: {e.stderr}')
         
@@ -1005,6 +1021,9 @@ async def create_customer(request: Request):
                     app_name = f"{customer_id}-{env['name']}"
                     namespace = f"{customer_id}-{env['name']}"
                     
+                    # Dev/preprod use develop branch, prod uses main
+                    target_branch = 'develop' if env['name'] in ['dev', 'preprod'] else 'main'
+                    
                     argocd_app = {
                         'apiVersion': 'argoproj.io/v1alpha1',
                         'kind': 'Application',
@@ -1022,7 +1041,7 @@ async def create_customer(request: Request):
                             'project': 'default',
                             'source': {
                                 'repoURL': f"https://github.com/{github['org']}/{github['repo']}.git",
-                                'targetRevision': github.get('branch', 'main'),
+                                'targetRevision': target_branch,
                                 'path': 'helm/app',
                                 'helm': {
                                     'valueFiles': [env['values_file']]
