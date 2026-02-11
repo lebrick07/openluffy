@@ -36,6 +36,12 @@ spec:
               value: "main"
             - name: OPENCLAW_TOKEN
               value: ""
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-api-keys
+                  key: claude-api-key
+                  optional: false
           livenessProbe:
             httpGet:
               path: /healthz

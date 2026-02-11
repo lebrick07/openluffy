@@ -30,3 +30,10 @@ github:
 
 aws:
   roleArn: ""
+
+secrets:
+  # claudeApiKey should be set via:
+  # - helm install --set secrets.claudeApiKey=$ANTHROPIC_API_KEY
+  # - or ArgoCD Application parameters (injected by workflow)
+  # DO NOT commit actual secret values to git
+  claudeApiKey: ""
