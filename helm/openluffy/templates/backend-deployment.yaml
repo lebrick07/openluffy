@@ -58,8 +58,6 @@ spec:
                   key: claude-api-key
                   optional: false
             {{- if .Values.postgres.enabled }}
-            - name: DATABASE_URL
-              value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@{{ include \"openluffy.fullname\" . }}-postgres:5432/$(POSTGRES_DB)"
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
@@ -75,6 +73,8 @@ spec:
                 secretKeyRef:
                   name: {{ include "openluffy.fullname" . }}-postgres
                   key: POSTGRES_DB
+            - name: DATABASE_URL
+              value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@{{ include "openluffy.fullname" . }}-postgres:5432/$(POSTGRES_DB)
             {{- end }}
           livenessProbe:
             httpGet:
