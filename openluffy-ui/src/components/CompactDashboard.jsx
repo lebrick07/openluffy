@@ -135,7 +135,7 @@ function CompactDashboard({ selectedCustomer }) {
                     </td>
                     <td className="cell-pods">
                       <span className={deployment.ready === deployment.replicas ? 'pods-healthy' : 'pods-warning'}>
-                        {deployment.ready}/{deployment.replicas}
+                        {deployment.ready ?? 0}/{deployment.replicas ?? 0}
                       </span>
                     </td>
                     <td className="cell-image">

@@ -9,7 +9,7 @@ dist/
 build/
 *.exe
 *.out
-app
+/app
 
 # Environment
 .env

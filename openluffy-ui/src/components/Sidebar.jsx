@@ -12,12 +12,6 @@ function Sidebar({ activeView, onViewChange, isOpen = false }) {
       description: 'All deployments & environments'
     },
     {
-      id: 'k8s',
-      icon: '☸️',
-      label: 'Kubernetes',
-      description: 'Deep cluster & pod insights'
-    },
-    {
       id: 'pipelines',
       icon: '🚀',
       label: 'CI/CD Pipelines',

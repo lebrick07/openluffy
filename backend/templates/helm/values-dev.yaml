@@ -1,0 +1,10 @@
+namespace: {{CUSTOMER_ID}}-dev
+environment: dev
+
+app:
+  image:
+    tag: dev-latest # Updated by CI/CD
+  replicas: 1
+
+ingress:
+  host: dev.{{CUSTOMER_ID}}.local

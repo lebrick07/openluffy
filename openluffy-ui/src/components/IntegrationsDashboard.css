@@ -807,3 +807,182 @@
   max-width: 400px;
   margin: 0 auto;
 }
+
+/* Danger Zone */
+.danger-zone {
+  margin-top: 3rem;
+  padding: 2rem;
+  border: 2px solid #f85149;
+  border-radius: 8px;
+  background: rgba(248, 81, 73, 0.05);
+}
+
+.danger-title {
+  color: #f85149 !important;
+  margin-bottom: 1rem;
+}
+
+.danger-zone-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 2rem;
+}
+
+.danger-zone-info {
+  flex: 1;
+}
+
+.danger-zone-info h4 {
+  color: #f85149;
+  margin-bottom: 0.5rem;
+}
+
+.danger-zone-info p {
+  margin-bottom: 0.75rem;
+  color: #c9d1d9;
+}
+
+.danger-zone-info ul {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+  color: #c9d1d9;
+}
+
+.danger-zone-info ul li {
+  margin-bottom: 0.25rem;
+}
+
+.danger-warning {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: rgba(248, 81, 73, 0.1);
+  border-left: 3px solid #f85149;
+  border-radius: 4px;
+}
+
+.btn-danger {
+  background: #f85149;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #da3633;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(248, 81, 73, 0.3);
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Delete Confirmation Modal */
+.delete-confirmation-warning {
+  color: #c9d1d9;
+}
+
+.customer-to-delete {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: rgba(248, 81, 73, 0.1);
+  border: 1px solid #f85149;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.customer-to-delete h3 {
+  color: #f85149;
+  margin: 0 0 0.5rem 0;
+}
+
+.customer-to-delete code {
+  background: rgba(110, 118, 129, 0.4);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+}
+
+.confirmation-input-group {
+  margin: 1.5rem 0;
+}
+
+.confirmation-input-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.confirmation-input-group code {
+  background: rgba(110, 118, 129, 0.4);
+  padding: 0.125rem 0.25rem;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  color: #58a6ff;
+}
+
+.delete-confirmation-input {
+  width: 100%;
+  padding: 0.75rem;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #c9d1d9;
+  font-size: 1rem;
+  font-family: 'Courier New', monospace;
+}
+
+.delete-confirmation-input:focus {
+  outline: none;
+  border-color: #f85149;
+  box-shadow: 0 0 0 3px rgba(248, 81, 73, 0.1);
+}
+
+.delete-result {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 6px;
+  border-left: 3px solid;
+}
+
+.delete-result.success {
+  background: rgba(46, 160, 67, 0.1);
+  border-color: #2ea043;
+  color: #3fb950;
+}
+
+.delete-result.error {
+  background: rgba(248, 81, 73, 0.1);
+  border-color: #f85149;
+  color: #f85149;
+}
+
+.delete-result ul {
+  margin-top: 0.5rem;
+  padding-left: 1.5rem;
+}
+
+.delete-result details {
+  margin-top: 0.5rem;
+}
+
+.delete-result summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.delete-result pre {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(110, 118, 129, 0.1);
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 0.875rem;
+}

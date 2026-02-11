@@ -11,7 +11,16 @@ const CLAUDE_MODELS = [
 
 function AIChatPanel({ onCollapse }) {
   const { activeCustomer } = useCustomer()
-  const [messages, setMessages] = useState([])
+  const [messages, setMessages] = useState(() => {
+    // Load chat history from localStorage on mount
+    try {
+      const saved = localStorage.getItem('luffy-chat-history')
+      return saved ? JSON.parse(saved) : []
+    } catch (e) {
+      console.error('Failed to load chat history:', e)
+      return []
+    }
+  })
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [selectedModel, setSelectedModel] = useState('claude-sonnet-4')
@@ -21,6 +30,15 @@ function AIChatPanel({ onCollapse }) {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('luffy-chat-history', JSON.stringify(messages))
+    } catch (e) {
+      console.error('Failed to save chat history:', e)
+    }
+  }, [messages])
 
   useEffect(() => {
     scrollToBottom()
@@ -143,6 +161,13 @@ function AIChatPanel({ onCollapse }) {
     }
   }
 
+  const clearHistory = () => {
+    if (confirm('Clear all chat history? This cannot be undone.')) {
+      setMessages([])
+      localStorage.removeItem('luffy-chat-history')
+    }
+  }
+
   const getContextString = () => {
     const parts = []
     if (activeCustomer) parts.push(`Customer: ${activeCustomer.name}`)
@@ -162,6 +187,11 @@ function AIChatPanel({ onCollapse }) {
         </div>
         
         <div className="ai-header-right">
+          {messages.length > 0 && (
+            <button className="chat-clear-btn" onClick={clearHistory} title="Clear chat history">
+              🗑️
+            </button>
+          )}
           <button className="chat-collapse-btn" onClick={onCollapse} title="Minimize chat">
             <span>▼</span>
           </button>

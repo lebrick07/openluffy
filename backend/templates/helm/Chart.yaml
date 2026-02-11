@@ -1,0 +1,5 @@
+apiVersion: v2
+name: {{CUSTOMER_ID}}
+description: {{CUSTOMER_NAME}} application
+type: application
+version: 0.1.0

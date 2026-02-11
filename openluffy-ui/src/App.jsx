@@ -6,11 +6,12 @@ import Sidebar from './components/Sidebar'
 import ApplicationsTable from './components/ApplicationsTable'
 import PendingApprovals from './components/PendingApprovals'
 import IntegrationsDashboard from './components/IntegrationsDashboard'
-import K8sInsights from './components/K8sInsights'
 import PipelinesView from './components/PipelinesView'
 import PipelineConfig from './components/PipelineConfig'
 import CreateCustomerWizard from './components/CreateCustomerWizard'
 import AIChatPanel from './components/AIChatPanel'
+import SettingsPage from './components/SettingsPage'
+import ErrorBoundary from './components/ErrorBoundary'
 
 function AppContent() {
   const { refreshCustomers } = useCustomer()
@@ -65,8 +66,6 @@ function AppContent() {
             selectedEnvironment={selectedEnvironment}
           />
         )
-      case 'k8s':
-        return <K8sInsights />
       case 'pipelines':
         return <PipelinesView />
       case 'pipeline-config':
@@ -97,18 +96,7 @@ function AppContent() {
           </div>
         )
       case 'settings':
-        return (
-          <div className="view-container">
-            <div className="view-header">
-              <h1>Settings</h1>
-              <p className="view-subtitle">Configuration and preferences</p>
-            </div>
-            <div className="coming-soon">
-              <p>🚧 Under Construction</p>
-              <p className="coming-soon-detail">Configuration options coming soon...</p>
-            </div>
-          </div>
-        )
+        return <SettingsPage />
       default:
         return (
           <ApplicationsTable 
@@ -235,9 +223,11 @@ function AppContent() {
 
 function App() {
   return (
-    <CustomerProvider>
-      <AppContent />
-    </CustomerProvider>
+    <ErrorBoundary>
+      <CustomerProvider>
+        <AppContent />
+      </CustomerProvider>
+    </ErrorBoundary>
   )
 }
 

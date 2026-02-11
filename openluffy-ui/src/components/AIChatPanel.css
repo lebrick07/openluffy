@@ -445,3 +445,19 @@
   background: #30363d;
   border-color: #484f58;
 }
+
+.chat-clear-btn {
+  background: transparent;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+  opacity: 0.7;
+}
+
+.chat-clear-btn:hover {
+  opacity: 1;
+  background: rgba(248, 81, 73, 0.1);
+}

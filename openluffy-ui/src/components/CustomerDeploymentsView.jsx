@@ -107,10 +107,10 @@ function CustomerDeploymentsView({ selectedCustomer }) {
                           <div className="deploy-name">{deploy.name}</div>
                           <div className="deploy-stats">
                             <span className="stat-replicas">
-                              {deploy.ready}/{deploy.replicas} pods
+                              {deploy.ready ?? 0}/{deploy.replicas ?? 0} pods
                             </span>
                             <span className={`stat-status ${getStatusColor(deploy.status)}`}>
-                              {deploy.status}
+                              {deploy.status ?? "unknown"}
                             </span>
                           </div>
                           <div className="deploy-image">{deploy.image?.split(':')[1] || 'latest'}</div>
@@ -139,10 +139,10 @@ function CustomerDeploymentsView({ selectedCustomer }) {
                           <div className="deploy-name">{deploy.name}</div>
                           <div className="deploy-stats">
                             <span className="stat-replicas">
-                              {deploy.ready}/{deploy.replicas} pods
+                              {deploy.ready ?? 0}/{deploy.replicas ?? 0} pods
                             </span>
                             <span className={`stat-status ${getStatusColor(deploy.status)}`}>
-                              {deploy.status}
+                              {deploy.status ?? "unknown"}
                             </span>
                           </div>
                           <div className="deploy-image">{deploy.image?.split(':')[1] || 'latest'}</div>
@@ -171,10 +171,10 @@ function CustomerDeploymentsView({ selectedCustomer }) {
                           <div className="deploy-name">{deploy.name}</div>
                           <div className="deploy-stats">
                             <span className="stat-replicas">
-                              {deploy.ready}/{deploy.replicas} pods
+                              {deploy.ready ?? 0}/{deploy.replicas ?? 0} pods
                             </span>
                             <span className={`stat-status ${getStatusColor(deploy.status)}`}>
-                              {deploy.status}
+                              {deploy.status ?? "unknown"}
                             </span>
                           </div>
                           <div className="deploy-image">{deploy.image?.split(':')[1] || 'latest'}</div>

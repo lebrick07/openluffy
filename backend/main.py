@@ -588,6 +588,8 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
     """
     Initialize a customer GitHub repo with CI/CD templates
     
+    Uses git clone + batch commit to avoid triggering multiple workflow runs.
+    
     Args:
         customer_id: Customer ID (e.g., 'acme-corp')
         customer_name: Display name (e.g., 'Acme Corp')
@@ -597,8 +599,9 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
     Returns:
         dict with templates_pushed list and message
     """
-    import requests
-    import base64
+    import subprocess
+    import tempfile
+    import shutil
     from pathlib import Path
     
     result = {'templates_pushed': [], 'message': '', 'errors': []}
@@ -606,7 +609,7 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
     try:
         templates_dir = Path(__file__).parent / 'templates'
         
-        # Map stack to template files
+        # Map stack to template files (HELM CHART STRUCTURE - following OpenLuffy pattern)
         stack_templates = {
             'nodejs': {
                 '.github/workflows/ci.yaml': 'ci-nodejs.yaml',
@@ -617,8 +620,15 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
                 'package.json': 'package.json',
                 '.gitignore': 'gitignore',
                 'README.md': 'README.md',
-                'k8s/deployment.yaml': 'k8s-deployment.yaml',
-                'k8s/service.yaml': 'k8s-service.yaml',
+                'helm/app/Chart.yaml': 'helm/Chart.yaml',
+                'helm/app/values.yaml': 'helm/values.yaml',
+                'helm/app/values/dev.yaml': 'helm/values-dev.yaml',
+                'helm/app/values/preprod.yaml': 'helm/values-preprod.yaml',
+                'helm/app/values/prod.yaml': 'helm/values-prod.yaml',
+                'helm/app/templates/_helpers.tpl': 'helm/templates/_helpers.tpl',
+                'helm/app/templates/deployment.yaml': 'helm/templates/deployment.yaml',
+                'helm/app/templates/service.yaml': 'helm/templates/service.yaml',
+                'helm/app/templates/ingress.yaml': 'helm/templates/ingress.yaml',
             },
             'python': {
                 '.github/workflows/ci.yaml': 'ci-python.yaml',
@@ -629,8 +639,15 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
                 'requirements.txt': 'requirements.txt',
                 '.gitignore': 'gitignore',
                 'README.md': 'README.md',
-                'k8s/deployment.yaml': 'k8s-deployment.yaml',
-                'k8s/service.yaml': 'k8s-service.yaml',
+                'helm/app/Chart.yaml': 'helm/Chart.yaml',
+                'helm/app/values.yaml': 'helm/values.yaml',
+                'helm/app/values/dev.yaml': 'helm/values-dev.yaml',
+                'helm/app/values/preprod.yaml': 'helm/values-preprod.yaml',
+                'helm/app/values/prod.yaml': 'helm/values-prod.yaml',
+                'helm/app/templates/_helpers.tpl': 'helm/templates/_helpers.tpl',
+                'helm/app/templates/deployment.yaml': 'helm/templates/deployment.yaml',
+                'helm/app/templates/service.yaml': 'helm/templates/service.yaml',
+                'helm/app/templates/ingress.yaml': 'helm/templates/ingress.yaml',
             },
             'golang': {
                 '.github/workflows/ci.yaml': 'ci-golang.yaml',
@@ -641,8 +658,15 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
                 'go.mod': 'go.mod',
                 '.gitignore': 'gitignore',
                 'README.md': 'README.md',
-                'k8s/deployment.yaml': 'k8s-deployment.yaml',
-                'k8s/service.yaml': 'k8s-service.yaml',
+                'helm/app/Chart.yaml': 'helm/Chart.yaml',
+                'helm/app/values.yaml': 'helm/values.yaml',
+                'helm/app/values/dev.yaml': 'helm/values-dev.yaml',
+                'helm/app/values/preprod.yaml': 'helm/values-preprod.yaml',
+                'helm/app/values/prod.yaml': 'helm/values-prod.yaml',
+                'helm/app/templates/_helpers.tpl': 'helm/templates/_helpers.tpl',
+                'helm/app/templates/deployment.yaml': 'helm/templates/deployment.yaml',
+                'helm/app/templates/service.yaml': 'helm/templates/service.yaml',
+                'helm/app/templates/ingress.yaml': 'helm/templates/ingress.yaml',
             }
         }
         
@@ -672,68 +696,117 @@ Visit: http://localhost:8080'''
             result['errors'].append(f'Unknown stack: {stack}')
             return result
         
-        for target_path, template_file in stack_templates[stack].items():
-            template_path = templates_dir / template_file
+        # Clone repo to temp directory
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_path = Path(tmpdir) / github['repo']
+            repo_url = f"https://{github['token']}@github.com/{github['org']}/{github['repo']}.git"
+            branch = github.get('branch', 'main')
             
-            if not template_path.exists():
-                result['errors'].append(f'Template not found: {template_file}')
-                continue
-            
-            # Read template content
-            with open(template_path, 'r') as f:
-                content = f.read()
-            
-            # Replace placeholders
-            stack_info = {
-                'nodejs': {'framework': 'Express.js', 'port': '3000'},
-                'python': {'framework': 'FastAPI', 'port': '8000'},
-                'golang': {'framework': 'net/http', 'port': '8080'},
-            }
-            
-            info = stack_info.get(stack, {'framework': 'Unknown', 'port': '8000'})
-            
-            content = content.replace('{{CUSTOMER_ID}}', customer_id)
-            content = content.replace('{{CUSTOMER_NAME}}', customer_name)
-            content = content.replace('{{GITHUB_OWNER}}', github['org'])
-            content = content.replace('{{REPO_NAME}}', github['repo'])
-            content = content.replace('{{STACK}}', stack.title())
-            content = content.replace('{{FRAMEWORK}}', info['framework'])
-            content = content.replace('{{PORT}}', info['port'])
-            content = content.replace('{{APP_NAME}}', github['repo'])
-            content = content.replace('{{NAMESPACE}}', f"{customer_id}-dev")
-            content = content.replace('{{ENVIRONMENT}}', 'development')
-            content = content.replace('{{STACK_SETUP}}', stack_instructions.get(stack, ''))
-            
-            # Push file to GitHub using GitHub API
-            file_url = f"https://api.github.com/repos/{github['org']}/{github['repo']}/contents/{target_path}"
-            
-            # Check if file exists
-            check_response = requests.get(file_url, headers={
-                'Authorization': f"token {github['token']}",
-                'Accept': 'application/vnd.github.v3+json'
-            })
-            
-            file_data = {
-                'message': f'Add {target_path} via OpenLuffy',
-                'content': base64.b64encode(content.encode()).decode(),
-                'branch': github.get('branch', 'main')
-            }
-            
-            if check_response.status_code == 200:
-                # File exists, update it
-                existing_file = check_response.json()
-                file_data['sha'] = existing_file['sha']
-            
-            # Create or update file
-            push_response = requests.put(file_url, json=file_data, headers={
-                'Authorization': f"token {github['token']}",
-                'Accept': 'application/vnd.github.v3+json'
-            })
-            
-            if push_response.ok:
-                result['templates_pushed'].append(target_path)
-            else:
-                result['errors'].append(f'Failed to push {target_path}: {push_response.status_code}')
+            try:
+                # Clone the repository
+                subprocess.run(
+                    ['git', 'clone', '--depth=1', '--branch', branch, repo_url, str(repo_path)],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                
+                # Process and write all template files
+                stack_info = {
+                    'nodejs': {'framework': 'Express.js', 'port': '3000'},
+                    'python': {'framework': 'FastAPI', 'port': '8000'},
+                    'golang': {'framework': 'net/http', 'port': '8080'},
+                }
+                
+                info = stack_info.get(stack, {'framework': 'Unknown', 'port': '8000'})
+                
+                for target_path, template_file in stack_templates[stack].items():
+                    template_path = templates_dir / template_file
+                    
+                    if not template_path.exists():
+                        result['errors'].append(f'Template not found: {template_file}')
+                        continue
+                    
+                    # Read and process template
+                    with open(template_path, 'r') as f:
+                        content = f.read()
+                    
+                    # Replace placeholders
+                    content = content.replace('{{CUSTOMER_ID}}', customer_id)
+                    content = content.replace('{{CUSTOMER_NAME}}', customer_name)
+                    content = content.replace('{{GITHUB_OWNER}}', github['org'])
+                    content = content.replace('{{REPO_NAME}}', github['repo'])
+                    content = content.replace('{{STACK}}', stack.title())
+                    content = content.replace('{{FRAMEWORK}}', info['framework'])
+                    content = content.replace('{{PORT}}', info['port'])
+                    content = content.replace('{{APP_NAME}}', github['repo'])
+                    content = content.replace('{{NAMESPACE}}', f"{customer_id}-dev")
+                    content = content.replace('{{ENVIRONMENT}}', 'development')
+                    content = content.replace('{{STACK_SETUP}}', stack_instructions.get(stack, ''))
+                    
+                    # Write file to repo
+                    file_path = repo_path / target_path
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    with open(file_path, 'w') as f:
+                        f.write(content)
+                    
+                    result['templates_pushed'].append(target_path)
+                
+                # Configure git user
+                subprocess.run(
+                    ['git', 'config', 'user.name', 'OpenLuffy'],
+                    cwd=repo_path,
+                    check=True
+                )
+                subprocess.run(
+                    ['git', 'config', 'user.email', 'openluffy@automation'],
+                    cwd=repo_path,
+                    check=True
+                )
+                
+                # Git add all files
+                subprocess.run(
+                    ['git', 'add', '-A'],
+                    cwd=repo_path,
+                    check=True,
+                    capture_output=True
+                )
+                
+                # Git commit (single commit for all files)
+                subprocess.run(
+                    ['git', 'commit', '-m', f'Initialize {customer_name} repository via OpenLuffy\n\nStack: {stack}\nFiles: {len(result["templates_pushed"])}'],
+                    cwd=repo_path,
+                    check=True,
+                    capture_output=True
+                )
+                
+                # Git push
+                subprocess.run(
+                    ['git', 'push', 'origin', branch],
+                    cwd=repo_path,
+                    check=True,
+                    capture_output=True
+                )
+                
+                # Create develop branch for dev/preprod deployments
+                subprocess.run(
+                    ['git', 'checkout', '-b', 'develop'],
+                    cwd=repo_path,
+                    check=True,
+                    capture_output=True
+                )
+                subprocess.run(
+                    ['git', 'push', 'origin', 'develop'],
+                    cwd=repo_path,
+                    check=True,
+                    capture_output=True
+                )
+                
+                result['branches_created'] = ['main', 'develop']
+                
+            except subprocess.CalledProcessError as e:
+                result['errors'].append(f'Git operation failed: {e.stderr}')
         
         result['message'] = f'Repository initialized with {len(result["templates_pushed"])} files'
         
@@ -833,7 +906,66 @@ async def create_customer(request: Request):
                 'error': f'Failed to check GitHub repository: {repo_response.status_code}'
             })
         
-        # Step 2: Store integrations
+        # Step 2: Create Customer record in database
+        if db_available:
+            try:
+                from database import SessionLocal
+                db = SessionLocal()
+                try:
+                    # Check if customer already exists
+                    existing_customer = db.query(Customer).filter(Customer.id == customer_id).first()
+                    if not existing_customer:
+                        customer = Customer(
+                            id=customer_id,
+                            name=customer_name,
+                            stack=stack
+                        )
+                        db.add(customer)
+                        db.commit()
+                        print(f"✅ Created customer record: {customer_name} ({customer_id})")
+                    else:
+                        print(f"ℹ️  Customer record already exists: {customer_name} ({customer_id})")
+                except Exception as db_error:
+                    db.rollback()
+                    print(f"⚠️  Failed to create customer record: {db_error}")
+                finally:
+                    db.close()
+            except Exception as e:
+                print(f"Database error: {e}")
+        
+        # Step 3: Store integrations (database + in-memory)
+        if db_available:
+            try:
+                from database import SessionLocal
+                db = SessionLocal()
+                try:
+                    # Create GitHub integration
+                    github_integration = Integration(
+                        customer_id=customer_id,
+                        type='github',
+                        config=github
+                    )
+                    db.add(github_integration)
+                    
+                    # Create ArgoCD integration
+                    argocd_integration = Integration(
+                        customer_id=customer_id,
+                        type='argocd',
+                        config=argocd
+                    )
+                    db.add(argocd_integration)
+                    
+                    db.commit()
+                    print(f"✅ Created integrations for {customer_id}")
+                except Exception as db_error:
+                    db.rollback()
+                    print(f"⚠️  Failed to create integrations: {db_error}")
+                finally:
+                    db.close()
+            except Exception as e:
+                print(f"Database error: {e}")
+        
+        # Also store in memory (backward compatibility)
         if customer_id not in integrations_store:
             integrations_store[customer_id] = {}
         
@@ -841,7 +973,7 @@ async def create_customer(request: Request):
         integrations_store[customer_id]['argocd'] = argocd
         save_integrations()  # Persist to disk
         
-        # Step 3: Create K8s namespaces (if k8s available)
+        # Step 4: Create K8s namespaces (if k8s available)
         namespaces_created = []
         if k8s_available:
             try:
@@ -854,7 +986,6 @@ async def create_customer(request: Request):
                                 name=namespace_name,
                                 labels={
                                     'customer': customer_id,
-                                    'customer-name': customer_name,
                                     'environment': env,
                                     'stack': stack,
                                     'managed-by': 'openluffy'
@@ -874,15 +1005,107 @@ async def create_customer(request: Request):
                 print(f"K8s namespace creation error: {k8s_error}")
                 result['k8s']['error'] = str(k8s_error)
         
-        # Step 4: Create ArgoCD applications (placeholder - would need ArgoCD API)
-        result['argocd']['applications'] = [
-            f"{customer_id}-dev",
-            f"{customer_id}-preprod",
-            f"{customer_id}-prod"
-        ]
-        result['argocd']['message'] = 'ArgoCD applications configured (manual sync required)'
+        # Step 5: Create ArgoCD applications
+        argocd_apps_created = []
+        argocd_errors = []
         
-        # Step 5: Push CI/CD templates to GitHub repo
+        if k8s_available:
+            try:
+                from kubernetes import client
+                custom_api = client.CustomObjectsApi()
+                
+                environments = [
+                    {'name': 'dev', 'auto_sync': True, 'values_file': 'values/dev.yaml'},
+                    {'name': 'preprod', 'auto_sync': True, 'values_file': 'values/preprod.yaml'},
+                    {'name': 'prod', 'auto_sync': False, 'values_file': 'values/prod.yaml'}
+                ]
+                
+                for env in environments:
+                    app_name = f"{customer_id}-{env['name']}"
+                    namespace = f"{customer_id}-{env['name']}"
+                    
+                    # Dev/preprod use develop branch, prod uses main
+                    target_branch = 'develop' if env['name'] in ['dev', 'preprod'] else 'main'
+                    
+                    argocd_app = {
+                        'apiVersion': 'argoproj.io/v1alpha1',
+                        'kind': 'Application',
+                        'metadata': {
+                            'name': app_name,
+                            'namespace': 'argocd',
+                            'finalizers': ['resources-finalizer.argocd.argoproj.io'],
+                            'labels': {
+                                'customer': customer_id,
+                                'environment': env['name'],
+                                'managed-by': 'openluffy'
+                            }
+                        },
+                        'spec': {
+                            'project': 'default',
+                            'source': {
+                                'repoURL': f"https://github.com/{github['org']}/{github['repo']}.git",
+                                'targetRevision': target_branch,
+                                'path': 'helm/app',
+                                'helm': {
+                                    'valueFiles': [env['values_file']]
+                                }
+                            },
+                            'destination': {
+                                'server': 'https://kubernetes.default.svc',
+                                'namespace': namespace
+                            },
+                            'syncPolicy': {
+                                'automated': {
+                                    'prune': env['auto_sync'],
+                                    'selfHeal': env['auto_sync']
+                                } if env['auto_sync'] else None,
+                                'syncOptions': ['CreateNamespace=true'],
+                                'retry': {
+                                    'limit': 5,
+                                    'backoff': {
+                                        'duration': '5s',
+                                        'factor': 2,
+                                        'maxDuration': '3m'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    try:
+                        custom_api.create_namespaced_custom_object(
+                            group='argoproj.io',
+                            version='v1alpha1',
+                            namespace='argocd',
+                            plural='applications',
+                            body=argocd_app
+                        )
+                        argocd_apps_created.append(app_name)
+                        print(f"✅ Created ArgoCD app: {app_name}")
+                    except Exception as app_error:
+                        if '409' in str(app_error):  # Already exists
+                            argocd_apps_created.append(f"{app_name} (already exists)")
+                        else:
+                            error_msg = f"Failed to create {app_name}: {str(app_error)}"
+                            argocd_errors.append(error_msg)
+                            print(f"❌ {error_msg}")
+                
+                result['argocd']['applications'] = argocd_apps_created
+                if argocd_errors:
+                    result['argocd']['errors'] = argocd_errors
+                    result['argocd']['message'] = f'Created {len(argocd_apps_created)} apps with {len(argocd_errors)} errors'
+                else:
+                    result['argocd']['message'] = f'Successfully created {len(argocd_apps_created)} ArgoCD applications'
+                    
+            except Exception as argocd_error:
+                result['argocd']['error'] = str(argocd_error)
+                result['argocd']['message'] = 'Failed to create ArgoCD applications'
+                print(f"ArgoCD creation error: {argocd_error}")
+        else:
+            result['argocd']['applications'] = []
+            result['argocd']['message'] = 'K8s not available - ArgoCD apps not created'
+        
+        # Step 6: Push CI/CD templates to GitHub repo
         template_result = initialize_customer_repo(customer_id, customer_name, stack, github)
         result['github'].update(template_result)
         
@@ -969,6 +1192,190 @@ async def reinitialize_customer_repo(customer_id: str, request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={'error': str(e)})
 
+@app.delete("/customers/{customer_id}")
+async def delete_customer(customer_id: str, request: Request, db: Session = Depends(get_db)):
+    """
+    Delete a customer and destroy all their environments
+    
+    Query params:
+    - delete_repo=true: Also delete the GitHub repository (default: false, archives instead)
+    - confirm=customer-id: Safety confirmation (required)
+    
+    This will:
+    1. Delete ArgoCD applications (dev, preprod, prod)
+    2. Delete K8s namespaces (dev, preprod, prod) 
+    3. Archive or delete GitHub repository
+    4. Delete customer record from database
+    5. Remove all integrations
+    """
+    try:
+        query_params = dict(request.query_params)
+        delete_repo = query_params.get('delete_repo', 'false').lower() == 'true'
+        confirmation = query_params.get('confirm', '')
+        
+        # Safety check: require confirmation
+        if confirmation != customer_id:
+            return JSONResponse(status_code=400, content={
+                'error': 'Confirmation required',
+                'message': f'Add ?confirm={customer_id} to confirm deletion'
+            })
+        
+        result = {
+            'success': True,
+            'customer_id': customer_id,
+            'deleted': {
+                'argocd_apps': [],
+                'k8s_namespaces': [],
+                'github_repo': None,
+                'integrations': [],
+                'database_record': False
+            },
+            'errors': []
+        }
+        
+        # Step 1: Get customer integrations
+        github_config = None
+        argocd_config = None
+        
+        if db_available:
+            try:
+                # Get GitHub integration
+                github_integration = db.query(Integration).filter(
+                    Integration.customer_id == customer_id,
+                    Integration.type == 'github'
+                ).first()
+                
+                if github_integration:
+                    github_config = github_integration.config
+                
+                # Get ArgoCD integration
+                argocd_integration = db.query(Integration).filter(
+                    Integration.customer_id == customer_id,
+                    Integration.type == 'argocd'
+                ).first()
+                
+                if argocd_integration:
+                    argocd_config = argocd_integration.config
+            except Exception as e:
+                result['errors'].append(f'Database query failed: {e}')
+        
+        # Fall back to in-memory store
+        if not github_config and customer_id in integrations_store:
+            github_config = integrations_store[customer_id].get('github')
+            argocd_config = integrations_store[customer_id].get('argocd')
+        
+        # Step 2: Delete ArgoCD applications
+        if k8s_available:
+            try:
+                from kubernetes import client
+                custom_api = client.CustomObjectsApi()
+                
+                for env in ['dev', 'preprod', 'prod']:
+                    app_name = f"{customer_id}-{env}"
+                    try:
+                        custom_api.delete_namespaced_custom_object(
+                            group="argoproj.io",
+                            version="v1alpha1",
+                            namespace="argocd",
+                            plural="applications",
+                            name=app_name
+                        )
+                        result['deleted']['argocd_apps'].append(app_name)
+                    except Exception as e:
+                        if '404' not in str(e):  # Ignore if doesn't exist
+                            result['errors'].append(f'Failed to delete ArgoCD app {app_name}: {e}')
+            except Exception as e:
+                result['errors'].append(f'ArgoCD deletion error: {e}')
+        
+        # Step 3: Delete K8s namespaces
+        if k8s_available:
+            try:
+                for env in ['dev', 'preprod', 'prod']:
+                    namespace_name = f"{customer_id}-{env}"
+                    try:
+                        v1.delete_namespace(namespace_name)
+                        result['deleted']['k8s_namespaces'].append(namespace_name)
+                    except Exception as e:
+                        if '404' not in str(e):  # Ignore if doesn't exist
+                            result['errors'].append(f'Failed to delete namespace {namespace_name}: {e}')
+            except Exception as e:
+                result['errors'].append(f'K8s namespace deletion error: {e}')
+        
+        # Step 4: Archive or delete GitHub repository
+        if github_config:
+            try:
+                import requests
+                
+                org = github_config.get('org')
+                repo = github_config.get('repo')
+                token = github_config.get('token')
+                
+                if delete_repo:
+                    # Permanently delete repository
+                    delete_url = f"https://api.github.com/repos/{org}/{repo}"
+                    delete_response = requests.delete(delete_url, headers={
+                        'Authorization': f"token {token}",
+                        'Accept': 'application/vnd.github.v3+json'
+                    })
+                    
+                    if delete_response.ok or delete_response.status_code == 404:
+                        result['deleted']['github_repo'] = f'Deleted: {org}/{repo}'
+                    else:
+                        result['errors'].append(f'Failed to delete repo: {delete_response.json().get("message", "Unknown error")}')
+                else:
+                    # Archive repository (safer)
+                    archive_url = f"https://api.github.com/repos/{org}/{repo}"
+                    archive_response = requests.patch(archive_url, json={'archived': True}, headers={
+                        'Authorization': f"token {token}",
+                        'Accept': 'application/vnd.github.v3+json'
+                    })
+                    
+                    if archive_response.ok:
+                        result['deleted']['github_repo'] = f'Archived: {org}/{repo}'
+                    else:
+                        result['errors'].append(f'Failed to archive repo: {archive_response.json().get("message", "Unknown error")}')
+            except Exception as e:
+                result['errors'].append(f'GitHub repo deletion error: {e}')
+        
+        # Step 5: Delete integrations from database
+        if db_available:
+            try:
+                deleted_count = db.query(Integration).filter(
+                    Integration.customer_id == customer_id
+                ).delete()
+                
+                result['deleted']['integrations'] = [f'{deleted_count} integrations']
+                db.commit()
+            except Exception as e:
+                db.rollback()
+                result['errors'].append(f'Database integration deletion failed: {e}')
+        
+        # Step 6: Delete customer record from database
+        if db_available:
+            try:
+                customer = db.query(Customer).filter(Customer.id == customer_id).first()
+                if customer:
+                    db.delete(customer)
+                    db.commit()
+                    result['deleted']['database_record'] = True
+                else:
+                    result['errors'].append('Customer record not found in database')
+            except Exception as e:
+                db.rollback()
+                result['errors'].append(f'Database customer deletion failed: {e}')
+        
+        # Step 7: Remove from in-memory store
+        if customer_id in integrations_store:
+            del integrations_store[customer_id]
+            save_integrations()
+        
+        # Determine overall success
+        result['success'] = len(result['errors']) == 0
+        
+        return result
+        
+    except Exception as e:
+        return JSONResponse(status_code=500, content={'error': str(e)})
 @app.get("/deployments")
 def get_deployments():
     """Get all deployments across all customer namespaces and environments - dynamically discovered"""
