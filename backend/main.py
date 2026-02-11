@@ -445,8 +445,23 @@ def get_customers():
 integrations_store = {}  # In-memory store: {customer_id: {integration_type: config}}
 
 @app.get("/customers/{customer_id}/integrations/{integration_type}")
-def get_customer_integration(customer_id: str, integration_type: str):
-    """Get integration config for a customer"""
+def get_customer_integration(customer_id: str, integration_type: str, db: Session = Depends(get_db)):
+    """Get integration config for a customer (database-first, with fallback)"""
+    
+    # Try database first (authoritative source)
+    if db_available:
+        try:
+            integration = db.query(Integration).filter(
+                Integration.customer_id == customer_id,
+                Integration.type == integration_type
+            ).first()
+            
+            if integration:
+                return integration.to_dict(mask_secrets=True)
+        except Exception as e:
+            print(f"Database query failed: {e}")
+    
+    # Fall back to in-memory store (backward compatibility)
     if customer_id not in integrations_store:
         return JSONResponse(status_code=404, content={'error': 'No integrations configured'})
     
@@ -457,15 +472,45 @@ def get_customer_integration(customer_id: str, integration_type: str):
     # Don't expose sensitive data in GET
     if 'token' in config:
         config['token'] = '***'
+    if 'password' in config:
+        config['password'] = '***'
     
     return config
 
 @app.post("/customers/{customer_id}/integrations/{integration_type}")
-async def save_customer_integration(customer_id: str, integration_type: str, request: Request):
-    """Save or update integration config for a customer"""
+async def save_customer_integration(customer_id: str, integration_type: str, request: Request, db: Session = Depends(get_db)):
+    """Save or update integration config for a customer (database-first)"""
     try:
         config = await request.json()
         
+        # Save to database (authoritative)
+        if db_available:
+            try:
+                # Check if integration already exists
+                existing = db.query(Integration).filter(
+                    Integration.customer_id == customer_id,
+                    Integration.type == integration_type
+                ).first()
+                
+                if existing:
+                    # Update existing
+                    existing.config = config
+                    existing.updated_at = datetime.utcnow()
+                else:
+                    # Create new
+                    integration = Integration(
+                        customer_id=customer_id,
+                        type=integration_type,
+                        config=config
+                    )
+                    db.add(integration)
+                
+                db.commit()
+            except Exception as e:
+                db.rollback()
+                print(f"Failed to save integration to database: {e}")
+        
+        # Also save to in-memory store (backward compatibility)
         if customer_id not in integrations_store:
             integrations_store[customer_id] = {}
         
@@ -477,21 +522,38 @@ async def save_customer_integration(customer_id: str, integration_type: str, req
         return JSONResponse(status_code=400, content={'error': str(e)})
 
 @app.delete("/customers/{customer_id}/integrations/{integration_type}")
-def delete_customer_integration(customer_id: str, integration_type: str):
-    """Remove integration config for a customer"""
-    if customer_id not in integrations_store:
-        return JSONResponse(status_code=404, content={'error': 'No integrations configured'})
+def delete_customer_integration(customer_id: str, integration_type: str, db: Session = Depends(get_db)):
+    """Remove integration config for a customer (database-first)"""
     
-    if integration_type not in integrations_store[customer_id]:
-        return JSONResponse(status_code=404, content={'error': f'{integration_type} not configured'})
+    # Delete from database (authoritative)
+    if db_available:
+        try:
+            integration = db.query(Integration).filter(
+                Integration.customer_id == customer_id,
+                Integration.type == integration_type
+            ).first()
+            
+            if integration:
+                db.delete(integration)
+                db.commit()
+            else:
+                # Not in database, check in-memory
+                if customer_id not in integrations_store or integration_type not in integrations_store[customer_id]:
+                    return JSONResponse(status_code=404, content={'error': f'{integration_type} not configured'})
+        except Exception as e:
+            db.rollback()
+            print(f"Failed to delete integration from database: {e}")
     
-    del integrations_store[customer_id][integration_type]
+    # Also delete from in-memory store (backward compatibility)
+    if customer_id in integrations_store and integration_type in integrations_store[customer_id]:
+        del integrations_store[customer_id][integration_type]
+        
+        # Clean up empty customer dict
+        if not integrations_store[customer_id]:
+            del integrations_store[customer_id]
+        
+        save_integrations()  # Persist to disk
     
-    # Clean up empty customer dict
-    if not integrations_store[customer_id]:
-        del integrations_store[customer_id]
-    
-    save_integrations()  # Persist to disk
     return {'success': True, 'message': f'{integration_type} integration removed'}
 
 @app.post("/customers/create")
