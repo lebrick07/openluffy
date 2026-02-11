@@ -4,7 +4,7 @@ namespace: openluffy-prod
 backend:
   image:
     repository: ghcr.io/lebrick07/openluffy-backend
-    tag: main-e9f7f55 # backend
+    tag: main-480ae15 # backend
     pullPolicy: IfNotPresent
   replicas: 1
   service:
@@ -14,7 +14,7 @@ backend:
 frontend:
   image:
     repository: ghcr.io/lebrick07/openluffy-frontend
-    tag: main-e9f7f55 # frontend
+    tag: main-480ae15 # frontend
     pullPolicy: IfNotPresent
   replicas: 1
   service:
