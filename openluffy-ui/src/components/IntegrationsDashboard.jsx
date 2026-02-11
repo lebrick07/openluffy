@@ -294,11 +294,16 @@ function IntegrationsDashboard() {
     if (!activeCustomer) return null
     
     try {
-      // TODO: Fetch customer's GitHub config from backend API
-      // For now, derive from customer ID (e.g., acme-corp → acme-corp/api)
-      const repoOwner = activeCustomer.id  // e.g., acme-corp
-      const repoName = activeCustomer.app || `${activeCustomer.id}-api`  // e.g., acme-corp-api
-      const repoUrl = `https://github.com/${repoOwner}/${repoName}`
+      // Fetch customer's GitHub config from backend API
+      const response = await fetch(`/api/customers/${activeCustomer.id}/integrations/github`)
+      
+      if (!response.ok) {
+        // Not configured yet
+        return null
+      }
+      
+      const config = await response.json()
+      const repoUrl = `https://github.com/${config.org}/${config.repo}`
       
       return {
         id: 'github',
@@ -307,12 +312,13 @@ function IntegrationsDashboard() {
         status: 'connected',
         statusText: 'Connected',
         metrics: {
-          'Repository': `${repoOwner}/${repoName}`,
-          'Customer': activeCustomer.name,
-          'Status': 'Ready to query'
+          'Repository': `${config.org}/${config.repo}`,
+          'Branch': config.branch || 'main',
+          'Customer': activeCustomer.name
         },
-        actions: ['View Repo', 'Workflows', 'Configure'],
-        url: repoUrl
+        actions: ['View Repo', 'Workflows', 'Configure', 'Remove'],
+        url: repoUrl,
+        config: config
       }
     } catch {
       return null
@@ -413,13 +419,33 @@ function IntegrationsDashboard() {
   }
 
   const handleSaveIntegration = async () => {
-    // TODO: Send config to backend to store credentials
-    console.log('Saving integration:', selectedToAdd.id, configData)
+    if (!activeCustomer) {
+      alert('No customer selected')
+      return
+    }
     
-    // For now, just close modal
-    // In production, this would save to backend and re-fetch integrations
-    setShowAddModal(false)
-    alert(`Integration configuration saved! (Backend API coming soon)`)
+    try {
+      const response = await fetch(`/api/customers/${activeCustomer.id}/integrations/${selectedToAdd.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(configData)
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to save integration')
+      }
+      
+      // Success - close modal and refresh
+      setShowAddModal(false)
+      setTestResult(null)
+      fetchConnectedIntegrations()
+      
+    } catch (error) {
+      alert(`Failed to save integration: ${error.message}`)
+    }
   }
 
   const handleAction = (integration, action) => {
@@ -427,8 +453,46 @@ function IntegrationsDashboard() {
       window.open(integration.url, '_blank')
     } else if (action === 'View Repo' && integration.url) {
       window.open(integration.url, '_blank')
+    } else if (action === 'Configure') {
+      handleConfigure(integration)
+    } else if (action === 'Remove') {
+      handleRemove(integration)
     } else {
       console.log(`Action: ${action} on ${integration.name}`)
+    }
+  }
+
+  const handleConfigure = (integration) => {
+    // Find the integration definition from availableIntegrations
+    const integrationDef = availableIntegrations.find(a => a.id === integration.id)
+    if (!integrationDef) return
+    
+    setSelectedToAdd(integrationDef)
+    setConfigData(integration.config || {})
+    setTestResult(null)
+    setShowAddModal(true)
+  }
+
+  const handleRemove = async (integration) => {
+    if (!activeCustomer) return
+    
+    if (!confirm(`Remove ${integration.name} integration for ${activeCustomer.name}?`)) {
+      return
+    }
+    
+    try {
+      const response = await fetch(`/api/customers/${activeCustomer.id}/integrations/${integration.id}`, {
+        method: 'DELETE'
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to remove integration')
+      }
+      
+      // Refresh integrations list
+      fetchConnectedIntegrations()
+    } catch (error) {
+      alert(`Failed to remove integration: ${error.message}`)
     }
   }
 

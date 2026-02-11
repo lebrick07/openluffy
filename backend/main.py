@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
@@ -290,6 +291,57 @@ def get_customers():
     })
     
     return {'customers': customers, 'total': len(customers)}
+
+# Customer Integrations Management
+integrations_store = {}  # In-memory store: {customer_id: {integration_type: config}}
+
+@app.get("/customers/{customer_id}/integrations/{integration_type}")
+def get_customer_integration(customer_id: str, integration_type: str):
+    """Get integration config for a customer"""
+    if customer_id not in integrations_store:
+        return JSONResponse(status_code=404, content={'error': 'No integrations configured'})
+    
+    if integration_type not in integrations_store[customer_id]:
+        return JSONResponse(status_code=404, content={'error': f'{integration_type} not configured'})
+    
+    config = integrations_store[customer_id][integration_type].copy()
+    # Don't expose sensitive data in GET
+    if 'token' in config:
+        config['token'] = '***'
+    
+    return config
+
+@app.post("/customers/{customer_id}/integrations/{integration_type}")
+async def save_customer_integration(customer_id: str, integration_type: str, request: Request):
+    """Save or update integration config for a customer"""
+    try:
+        config = await request.json()
+        
+        if customer_id not in integrations_store:
+            integrations_store[customer_id] = {}
+        
+        integrations_store[customer_id][integration_type] = config
+        
+        return {'success': True, 'message': f'{integration_type} integration saved'}
+    except Exception as e:
+        return JSONResponse(status_code=400, content={'error': str(e)})
+
+@app.delete("/customers/{customer_id}/integrations/{integration_type}")
+def delete_customer_integration(customer_id: str, integration_type: str):
+    """Remove integration config for a customer"""
+    if customer_id not in integrations_store:
+        return JSONResponse(status_code=404, content={'error': 'No integrations configured'})
+    
+    if integration_type not in integrations_store[customer_id]:
+        return JSONResponse(status_code=404, content={'error': f'{integration_type} not configured'})
+    
+    del integrations_store[customer_id][integration_type]
+    
+    # Clean up empty customer dict
+    if not integrations_store[customer_id]:
+        del integrations_store[customer_id]
+    
+    return {'success': True, 'message': f'{integration_type} integration removed'}
 
 @app.get("/deployments")
 def get_deployments():
