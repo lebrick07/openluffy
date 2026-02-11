@@ -6,7 +6,6 @@ import Sidebar from './components/Sidebar'
 import ApplicationsTable from './components/ApplicationsTable'
 import PendingApprovals from './components/PendingApprovals'
 import IntegrationsDashboard from './components/IntegrationsDashboard'
-import K8sInsights from './components/K8sInsights'
 import PipelinesView from './components/PipelinesView'
 import PipelineConfig from './components/PipelineConfig'
 import CreateCustomerWizard from './components/CreateCustomerWizard'
@@ -65,8 +64,6 @@ function AppContent() {
             selectedEnvironment={selectedEnvironment}
           />
         )
-      case 'k8s':
-        return <K8sInsights />
       case 'pipelines':
         return <PipelinesView />
       case 'pipeline-config':
