@@ -1,0 +1,20 @@
+app:
+  name: {{APP_NAME}}
+  image:
+    repository: ghcr.io/{{GITHUB_OWNER}}/{{REPO_NAME}}
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  port: {{PORT}}
+  service:
+    type: ClusterIP
+    port: 80
+
+ingress:
+  enabled: true
+  className: traefik
+  host: {{CUSTOMER_ID}}.local
+
+# Environment-specific values
+namespace: {{CUSTOMER_ID}}-dev
+environment: dev

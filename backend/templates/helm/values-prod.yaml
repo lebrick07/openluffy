@@ -1,0 +1,10 @@
+namespace: {{CUSTOMER_ID}}-prod
+environment: prod
+
+app:
+  image:
+    tag: latest # Production release
+  replicas: 2  # Higher availability in prod
+
+ingress:
+  host: {{CUSTOMER_ID}}.local  # Production domain
