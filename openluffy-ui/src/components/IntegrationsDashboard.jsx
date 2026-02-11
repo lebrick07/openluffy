@@ -302,7 +302,10 @@ function IntegrationsDashboard() {
         return null
       }
       
-      const config = await response.json()
+      const data = await response.json()
+      // Backend returns { id, customer_id, type, config: { org, repo, token, branch } }
+      // Extract the actual config
+      const config = data.config || data
       const repoUrl = `https://github.com/${config.org}/${config.repo}`
       
       return {
