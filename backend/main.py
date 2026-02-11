@@ -609,7 +609,9 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
         # Map stack to template files
         stack_templates = {
             'nodejs': {
-                '.github/workflows/ci.yaml': 'workflow-nodejs.yaml',
+                '.github/workflows/ci.yaml': 'ci-nodejs.yaml',
+                '.github/workflows/release-dev.yaml': 'release-dev.yaml',
+                '.github/workflows/release-prod.yaml': 'release-prod.yaml',
                 'Dockerfile': 'Dockerfile-nodejs',
                 'index.js': 'app-nodejs.js',
                 'package.json': 'package.json',
@@ -619,7 +621,9 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
                 'k8s/service.yaml': 'k8s-service.yaml',
             },
             'python': {
-                '.github/workflows/ci.yaml': 'workflow-python.yaml',
+                '.github/workflows/ci.yaml': 'ci-python.yaml',
+                '.github/workflows/release-dev.yaml': 'release-dev.yaml',
+                '.github/workflows/release-prod.yaml': 'release-prod.yaml',
                 'Dockerfile': 'Dockerfile-python',
                 'app.py': 'app-python.py',
                 'requirements.txt': 'requirements.txt',
@@ -629,7 +633,9 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
                 'k8s/service.yaml': 'k8s-service.yaml',
             },
             'golang': {
-                '.github/workflows/ci.yaml': 'workflow-golang.yaml',
+                '.github/workflows/ci.yaml': 'ci-golang.yaml',
+                '.github/workflows/release-dev.yaml': 'release-dev.yaml',
+                '.github/workflows/release-prod.yaml': 'release-prod.yaml',
                 'Dockerfile': 'Dockerfile-golang',
                 'main.go': 'app-golang.go',
                 'go.mod': 'go.mod',
