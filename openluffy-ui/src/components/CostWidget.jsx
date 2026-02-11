@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import './CostWidget.css'
 
 function CostWidget() {
-  const [costs, setCosts] = useState({
+  const [costs] = useState({
     today: 4.73,
     week: 28.45,
     month: 142.35,

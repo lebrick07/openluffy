@@ -13,10 +13,8 @@ function App() {
   const [activeView, setActiveView] = useState('applications')
   const [selectedCustomer, setSelectedCustomer] = useState(null)
   const [selectedEnvironment, setSelectedEnvironment] = useState('all')
-  const [showCreateWizard, setShowCreateWizard] = useState(null)
 
   const handleCreateNew = (type) => {
-    setShowCreateWizard(type)
     // TODO: Open customer creation wizard modal
     alert(`Create New ${type.charAt(0).toUpperCase() + type.slice(1)} - Wizard coming soon`)
   }

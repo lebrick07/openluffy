@@ -9,7 +9,7 @@ const CLAUDE_MODELS = [
   { id: 'claude-haiku-3', name: 'Claude Haiku 3', description: 'Fastest, most affordable' },
 ]
 
-function AIChatPanel({ isOpen, onCollapse }) {
+function AIChatPanel({ onCollapse }) {
   const { activeCustomer } = useCustomer()
   const [messages, setMessages] = useState([])
   const [inputValue, setInputValue] = useState('')

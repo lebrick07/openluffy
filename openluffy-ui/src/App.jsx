@@ -172,7 +172,7 @@ function App() {
                   <button className="chat-expand-btn">▲ Expand</button>
                 </div>
               ) : (
-                <AIChatPanel isOpen={true} onCollapse={() => setChatCollapsed(true)} />
+                <AIChatPanel onCollapse={() => setChatCollapsed(true)} />
               )}
             </div>
           </div>

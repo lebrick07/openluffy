@@ -46,8 +46,8 @@ function ApplicationsTable({ selectedEnvironment }) {
     return 'status-error'
   }
 
-  const getPipelineStatus = (customerId) => {
-    // TODO: Get real pipeline status
+  const getPipelineStatus = () => {
+    // TODO: Get real pipeline status from API
     return '✓'
   }
 
@@ -75,18 +75,6 @@ function ApplicationsTable({ selectedEnvironment }) {
       console.log('Rollback:', deployment)
       alert('Rollback - Backend API coming soon')
     }
-  }
-
-  const handleRestart = (deployment, e) => {
-    e.stopPropagation()
-    console.log('Restart:', deployment)
-    alert(`Restart ${deployment.name} - Backend API coming soon`)
-  }
-
-  const handleEdit = (deployment, e) => {
-    e.stopPropagation()
-    console.log('Edit:', deployment)
-    alert('Edit - Backend API coming soon')
   }
 
   // Filter deployments
@@ -163,7 +151,7 @@ function ApplicationsTable({ selectedEnvironment }) {
                 </td>
                 <td className="cell-pipeline">
                   <span className="pipeline-icon" title="Pipeline passing">
-                    {getPipelineStatus(deployment.customer)}
+                    {getPipelineStatus()}
                   </span>
                 </td>
                 <td className="cell-time">

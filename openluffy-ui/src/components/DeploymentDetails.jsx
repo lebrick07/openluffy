@@ -7,9 +7,6 @@ function DeploymentDetails({ deploymentId, onClose }) {
   const [details, setDetails] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
-  const [selectedPod, setSelectedPod] = useState(null)
-  const [podLogs, setPodLogs] = useState('')
-  const [loadingLogs, setLoadingLogs] = useState(false)
 
   useEffect(() => {
     if (deploymentId) {
