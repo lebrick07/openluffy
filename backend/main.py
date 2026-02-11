@@ -551,6 +551,93 @@ async def create_customer(request: Request):
         ]
         result['argocd']['message'] = 'ArgoCD applications configured (manual sync required)'
         
+        # Step 5: Push CI/CD templates to GitHub repo
+        try:
+            from pathlib import Path
+            import base64
+            
+            templates_dir = Path(__file__).parent / 'templates'
+            
+            # Map stack to template files
+            stack_templates = {
+                'nodejs': {
+                    '.github/workflows/ci.yaml': 'workflow-nodejs.yaml',
+                    'Dockerfile': 'dockerfile-nodejs',
+                    'index.js': 'app-nodejs.js',
+                    'package.json': 'package-nodejs.json',
+                },
+                'python': {
+                    '.github/workflows/ci.yaml': 'workflow-python.yaml',
+                    'Dockerfile': 'dockerfile-python',
+                    'main.py': 'app-python.py',
+                    'requirements.txt': 'requirements-python.txt',
+                },
+                'go': {
+                    '.github/workflows/ci.yaml': 'workflow-go.yaml',
+                    'Dockerfile': 'dockerfile-go',
+                    'main.go': 'app-go.go',
+                    'go.mod': 'go-mod.txt',
+                }
+            }
+            
+            if stack in stack_templates:
+                files_pushed = []
+                
+                for target_path, template_file in stack_templates[stack].items():
+                    template_path = templates_dir / template_file
+                    
+                    if not template_path.exists():
+                        print(f"Template not found: {template_path}")
+                        continue
+                    
+                    # Read template content
+                    with open(template_path, 'r') as f:
+                        content = f.read()
+                    
+                    # Replace placeholders
+                    content = content.replace('{{CUSTOMER_ID}}', customer_id)
+                    content = content.replace('{{CUSTOMER_NAME}}', customer_name)
+                    content = content.replace('{{GITHUB_ORG}}', github['org'])
+                    content = content.replace('{{REPO_NAME}}', github['repo'])
+                    
+                    # Push file to GitHub using GitHub API
+                    file_url = f"https://api.github.com/repos/{github['org']}/{github['repo']}/contents/{target_path}"
+                    
+                    # Check if file exists
+                    check_response = requests.get(file_url, headers={
+                        'Authorization': f"token {github['token']}",
+                        'Accept': 'application/vnd.github.v3+json'
+                    })
+                    
+                    file_data = {
+                        'message': f'Add {target_path} via OpenLuffy',
+                        'content': base64.b64encode(content.encode()).decode(),
+                        'branch': github.get('branch', 'main')
+                    }
+                    
+                    if check_response.status_code == 200:
+                        # File exists, update it
+                        existing_file = check_response.json()
+                        file_data['sha'] = existing_file['sha']
+                    
+                    # Create or update file
+                    push_response = requests.put(file_url, json=file_data, headers={
+                        'Authorization': f"token {github['token']}",
+                        'Accept': 'application/vnd.github.v3+json'
+                    })
+                    
+                    if push_response.ok:
+                        files_pushed.append(target_path)
+                    else:
+                        print(f"Failed to push {target_path}: {push_response.status_code}")
+                
+                result['github']['templates_pushed'] = files_pushed
+                result['github']['message'] = f'Repository initialized with {len(files_pushed)} files'
+            
+        except Exception as e:
+            print(f"Failed to push templates: {e}")
+            result['github']['template_error'] = str(e)
+        
         return result
         
     except Exception as e:

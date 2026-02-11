@@ -1,0 +1,7 @@
+module github.com/{{GITHUB_ORG}}/{{REPO_NAME}}
+
+go 1.21
+
+require (
+	// Add your dependencies here
+)
