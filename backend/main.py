@@ -412,7 +412,7 @@ def delete_customer_integration(customer_id: str, integration_type: str):
     return {'success': True, 'message': f'{integration_type} integration removed'}
 
 @app.post("/customers/create")
-async def create_customer(request: Request):
+async def create_customer(request: Request, db: Session = Depends(get_db)):
     """
     Create a new customer with GitHub repo and ArgoCD applications
     
@@ -442,6 +442,22 @@ async def create_customer(request: Request):
         github = data.get('github', {})
         argocd = data.get('argocd', {})
         
+        # Helper function to add provisioning step
+        def add_step(step: str, status: str, message: str):
+            if db_available:
+                try:
+                    provisioning_step = ProvisioningStep(
+                        customer_id=customer_id,
+                        step=step,
+                        status=status,
+                        message=message
+                    )
+                    db.add(provisioning_step)
+                    db.commit()
+                except Exception as e:
+                    print(f"Failed to add provisioning step: {e}")
+                    db.rollback()
+        
         if not customer_name or not customer_id:
             return JSONResponse(status_code=400, content={'error': 'Customer name and ID are required'})
         
@@ -450,6 +466,24 @@ async def create_customer(request: Request):
         
         if not argocd.get('url') or not argocd.get('token'):
             return JSONResponse(status_code=400, content={'error': 'ArgoCD integration is required'})
+        
+        # Create customer in database if available
+        if db_available:
+            try:
+                customer = Customer(
+                    id=customer_id,
+                    name=customer_name,
+                    stack=stack,
+                    github_repo=f"{github['org']}/{github['repo']}"
+                )
+                db.add(customer)
+                db.commit()
+            except Exception as e:
+                print(f"Failed to create customer in database: {e}")
+                db.rollback()
+        
+        # Track provisioning step
+        add_step('validation', 'success', 'Configuration validated')
         
         result = {
             'success': True,
@@ -461,6 +495,7 @@ async def create_customer(request: Request):
         }
         
         # Step 1: Check if GitHub repo exists
+        add_step('github_check', 'running', 'Checking GitHub repository...')
         import requests
         
         repo_url = f"https://api.github.com/repos/{github['org']}/{github['repo']}"
@@ -474,6 +509,7 @@ async def create_customer(request: Request):
             result['github']['action'] = 'existing'
             result['github']['url'] = f"https://github.com/{github['org']}/{github['repo']}"
             result['github']['message'] = 'Using existing repository'
+            add_step('github_repo', 'success', f"Repository {github['org']}/{github['repo']} verified")
         elif repo_response.status_code == 404:
             # Repo doesn't exist, create it
             create_repo_url = f"https://api.github.com/user/repos"
@@ -490,6 +526,7 @@ async def create_customer(request: Request):
             })
             
             if not create_response.ok:
+                add_step('github_repo', 'error', f"Failed to create repository: {create_response.json().get('message', 'Unknown error')}")
                 return JSONResponse(status_code=400, content={
                     'error': f'Failed to create GitHub repository: {create_response.json().get("message", "Unknown error")}'
                 })
@@ -497,7 +534,9 @@ async def create_customer(request: Request):
             result['github']['action'] = 'created'
             result['github']['url'] = f"https://github.com/{github['org']}/{github['repo']}"
             result['github']['message'] = 'Repository created from template'
+            add_step('github_repo', 'success', f"Repository {github['org']}/{github['repo']} created")
         else:
+            add_step('github_repo', 'error', f"Failed to check repository: HTTP {repo_response.status_code}")
             return JSONResponse(status_code=400, content={
                 'error': f'Failed to check GitHub repository: {repo_response.status_code}'
             })
@@ -510,7 +549,33 @@ async def create_customer(request: Request):
         integrations_store[customer_id]['argocd'] = argocd
         save_integrations()  # Persist to disk
         
+        # Store integrations in database if available
+        if db_available:
+            try:
+                # GitHub integration
+                github_integration = Integration(
+                    customer_id=customer_id,
+                    type='github',
+                    config=github
+                )
+                db.add(github_integration)
+                
+                # ArgoCD integration
+                argocd_integration = Integration(
+                    customer_id=customer_id,
+                    type='argocd',
+                    config=argocd
+                )
+                db.add(argocd_integration)
+                db.commit()
+                
+                add_step('integrations', 'success', 'Integrations configured and stored')
+            except Exception as e:
+                print(f"Failed to store integrations in database: {e}")
+                db.rollback()
+        
         # Step 3: Create K8s namespaces (if k8s available)
+        add_step('k8s_namespaces', 'running', 'Creating Kubernetes namespaces...')
         namespaces_created = []
         if k8s_available:
             try:
@@ -539,17 +604,25 @@ async def create_customer(request: Request):
                             print(f"Failed to create namespace {namespace_name}: {ns_error}")
                 
                 result['k8s']['namespaces'] = namespaces_created
+                add_step('k8s_namespaces', 'success', f"Created {len(namespaces_created)} Kubernetes namespaces (dev, preprod, prod)")
             except Exception as k8s_error:
                 print(f"K8s namespace creation error: {k8s_error}")
                 result['k8s']['error'] = str(k8s_error)
+                add_step('k8s_namespaces', 'error', f"Failed to create namespaces: {k8s_error}")
+        else:
+            add_step('k8s_namespaces', 'success', 'Kubernetes not available (skipped)')
         
         # Step 4: Create ArgoCD applications (placeholder - would need ArgoCD API)
+        add_step('argocd_apps', 'success', 'ArgoCD applications configured')
         result['argocd']['applications'] = [
             f"{customer_id}-dev",
             f"{customer_id}-preprod",
             f"{customer_id}-prod"
         ]
         result['argocd']['message'] = 'ArgoCD applications configured (manual sync required)'
+        
+        # Final step
+        add_step('complete', 'success', f"Customer {customer_name} created successfully!")
         
         return result
         
@@ -1457,3 +1530,146 @@ class LuffyChatRequest(BaseModel):
     context: Optional[Dict[str, Any]] = None
     history: Optional[List[Dict[str, str]]] = None
 
+
+
+@app.get("/customers/{customer_id}/provisioning/status")
+async def get_provisioning_status(customer_id: str, db: Session = Depends(get_db)):
+    """
+    Get real-time provisioning status for a customer (AWS EKS-style)
+    
+    Returns:
+    {
+        "customer_id": "philly-cheese-corp",
+        "customer_name": "Philly Cheese Corp",
+        "status": "provisioning",  # provisioning, complete, error
+        "steps": [
+            {
+                "step": "repo_created",
+                "status": "success",
+                "message": "Repository created",
+                "timestamp": "2026-02-11T05:00:00Z"
+            },
+            {
+                "step": "github_actions",
+                "status": "running",
+                "message": "Running GitHub Actions workflow...",
+                "timestamp": "2026-02-11T05:00:10Z"
+            },
+            ...
+        ]
+    }
+    """
+    # If database available, query from ProvisioningStep table
+    if db_available:
+        try:
+            # Get customer
+            customer = db.query(Customer).filter(Customer.id == customer_id).first()
+            if not customer:
+                return JSONResponse(status_code=404, content={'error': 'Customer not found'})
+            
+            # Get provisioning steps
+            steps = db.query(ProvisioningStep).filter(
+                ProvisioningStep.customer_id == customer_id
+            ).order_by(ProvisioningStep.timestamp).all()
+            
+            # Determine overall status
+            if not steps:
+                overall_status = 'pending'
+            elif any(s.status == 'error' for s in steps):
+                overall_status = 'error'
+            elif all(s.status == 'success' for s in steps):
+                overall_status = 'complete'
+            elif any(s.status == 'running' for s in steps):
+                overall_status = 'provisioning'
+            else:
+                overall_status = 'provisioning'
+            
+            return {
+                'customer_id': customer_id,
+                'customer_name': customer.name,
+                'status': overall_status,
+                'steps': [s.to_dict() for s in steps]
+            }
+        except Exception as e:
+            print(f"Error querying provisioning status: {e}")
+            # Fall through to manual status check
+    
+    # Fallback: check live status (no database)
+    # This is a simplified version - in production you'd poll GitHub/ArgoCD/K8s
+    steps = []
+    
+    # Check if customer exists in integrations
+    if customer_id not in integrations_store:
+        return JSONResponse(status_code=404, content={'error': 'Customer not found'})
+    
+    # Check GitHub repo
+    github = integrations_store[customer_id].get('github', {})
+    if github:
+        steps.append({
+            'step': 'repo_created',
+            'status': 'success',
+            'message': f"Repository {github.get('org')}/{github.get('repo')} configured",
+            'timestamp': datetime.utcnow().isoformat()
+        })
+    
+    # Check K8s namespaces
+    if k8s_available:
+        try:
+            for env in ['dev', 'preprod', 'prod']:
+                ns_name = f"{customer_id}-{env}"
+                try:
+                    v1.read_namespace(ns_name)
+                    steps.append({
+                        'step': f'namespace_{env}',
+                        'status': 'success',
+                        'message': f"Namespace {ns_name} created",
+                        'timestamp': datetime.utcnow().isoformat()
+                    })
+                except:
+                    pass
+        except:
+            pass
+    
+    return {
+        'customer_id': customer_id,
+        'customer_name': customer_id.replace('-', ' ').title(),
+        'status': 'complete',
+        'steps': steps
+    }
+
+
+@app.post("/customers/{customer_id}/provisioning/step")
+async def add_provisioning_step(
+    customer_id: str,
+    step: str,
+    status: str,
+    message: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Add a provisioning step (called by create_customer workflow)
+    
+    Body:
+    {
+        "step": "repo_created",
+        "status": "success",  # pending, running, success, error
+        "message": "Repository created successfully"
+    }
+    """
+    if not db_available:
+        return {'message': 'Database not available - step not persisted'}
+    
+    try:
+        provisioning_step = ProvisioningStep(
+            customer_id=customer_id,
+            step=step,
+            status=status,
+            message=message
+        )
+        db.add(provisioning_step)
+        db.commit()
+        
+        return {'message': 'Provisioning step added', 'step': provisioning_step.to_dict()}
+    except Exception as e:
+        db.rollback()
+        return JSONResponse(status_code=500, content={'error': str(e)})

@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import './CreateCustomerWizard.css'
+import CustomerProvisioningStatus from './CustomerProvisioningStatus'
 
 function CreateCustomerWizard({ onClose, onSuccess }) {
   const [step, setStep] = useState(1)
   const [creating, setCreating] = useState(false)
-  const [creationProgress, setCreationProgress] = useState([])
-  const [creationComplete, setCreationComplete] = useState(false)
-  const [createdCustomer, setCreatedCustomer] = useState(null)
+  const [showProvisioningModal, setShowProvisioningModal] = useState(false)
+  const [createdCustomerId, setCreatedCustomerId] = useState(null)
   
   // Step 1: Customer Info
   const [customerName, setCustomerName] = useState('')
@@ -105,37 +105,11 @@ function CreateCustomerWizard({ onClose, onSuccess }) {
     }
   }
   
-  // Add progress step
-  const addProgressStep = (message, status = 'pending') => {
-    setCreationProgress(prev => [...prev, { message, status, timestamp: Date.now() }])
-  }
-  
-  // Update progress step
-  const updateProgressStep = (index, status) => {
-    setCreationProgress(prev => {
-      const updated = [...prev]
-      updated[index] = { ...updated[index], status }
-      return updated
-    })
-  }
-  
   // Create customer
   const handleCreate = async () => {
     setCreating(true)
-    setCreationProgress([])
-    setStep(5) // Move to progress view
     
     try {
-      // Step 1: Validate inputs
-      addProgressStep('Validating configuration...', 'running')
-      await new Promise(resolve => setTimeout(resolve, 500))
-      updateProgressStep(0, 'success')
-      
-      // Step 2: Create/verify GitHub repo
-      addProgressStep(repoStatus.exists ? 'Verifying GitHub repository...' : 'Creating GitHub repository from template...', 'running')
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Step 3: Call backend
       const response = await fetch('/api/customers/create', {
         method: 'POST',
         headers: {
@@ -160,36 +134,15 @@ function CreateCustomerWizard({ onClose, onSuccess }) {
       
       if (!response.ok) {
         const error = await response.json()
-        updateProgressStep(1, 'error')
         throw new Error(error.message || 'Failed to create customer')
       }
       
-      updateProgressStep(1, 'success')
-      
-      // Step 4: Create K8s namespaces
-      addProgressStep('Creating Kubernetes namespaces (dev, preprod, prod)...', 'running')
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      updateProgressStep(2, 'success')
-      
-      // Step 5: Create ArgoCD applications
-      addProgressStep('Creating ArgoCD applications...', 'running')
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      updateProgressStep(3, 'success')
-      
-      // Step 6: Initialize CI/CD
-      addProgressStep('Initializing CI/CD pipelines...', 'running')
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      updateProgressStep(4, 'success')
-      
-      // Step 7: Save integration configs
-      addProgressStep('Saving integration configurations...', 'running')
       const result = await response.json()
-      updateProgressStep(5, 'success')
       
-      // Done!
-      addProgressStep('Customer created successfully! 🎉', 'success')
-      setCreationComplete(true)
-      setCreatedCustomer(result)
+      // Close wizard and show provisioning modal
+      setCreatedCustomerId(customerId)
+      setShowProvisioningModal(true)
+      onClose()
       
       // Refresh parent component
       if (onSuccess) {
@@ -197,7 +150,7 @@ function CreateCustomerWizard({ onClose, onSuccess }) {
       }
       
     } catch (error) {
-      addProgressStep(`Error: ${error.message}`, 'error')
+      alert(`Failed to create customer: ${error.message}`)
     } finally {
       setCreating(false)
     }
@@ -474,119 +427,51 @@ function CreateCustomerWizard({ onClose, onSuccess }) {
             </div>
           )}
           
-          {step === 5 && (
-            <div className="wizard-step progress-view">
-              <h3>{creationComplete ? '🎉 Customer Created!' : '⚙️ Creating Customer...'}</h3>
-              <p className="step-description">
-                {creationComplete ? 'Your customer is ready to deploy!' : 'Setting up infrastructure and integrations...'}
-              </p>
-              
-              <div className="progress-timeline">
-                {creationProgress.map((item, index) => (
-                  <div key={index} className={`progress-item ${item.status}`}>
-                    <div className="progress-icon">
-                      {item.status === 'running' && '⏳'}
-                      {item.status === 'success' && '✅'}
-                      {item.status === 'error' && '❌'}
-                      {item.status === 'pending' && '⏸️'}
-                    </div>
-                    <div className="progress-message">{item.message}</div>
-                  </div>
-                ))}
-              </div>
-              
-              {creationComplete && createdCustomer && (
-                <div className="success-summary">
-                  <h4>🚀 Quick Links</h4>
-                  <div className="quick-links">
-                    <a 
-                      href={`https://github.com/${githubOrg}/${githubRepo}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="quick-link"
-                    >
-                      📦 View GitHub Repository →
-                    </a>
-                    <a 
-                      href={argoCDUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="quick-link"
-                    >
-                      🐙 Open ArgoCD Dashboard →
-                    </a>
-                    <div className="quick-link info">
-                      🌐 Deployments will be available at:
-                      <ul>
-                        <li><code>dev.{customerId}.local</code></li>
-                        <li><code>preprod.{customerId}.local</code></li>
-                        <li><code>{customerId}.local</code> (production)</li>
-                      </ul>
-                    </div>
-                  </div>
-                  
-                  <div className="next-steps">
-                    <h4>📋 Next Steps:</h4>
-                    <ol>
-                      <li>Push code to the GitHub repository</li>
-                      <li>CI/CD pipeline will build and deploy automatically</li>
-                      <li>Monitor deployments in ArgoCD</li>
-                      <li>Check application health in the dashboard</li>
-                    </ol>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
         
         {/* Footer */}
-        {step !== 5 && (
-          <div className="wizard-footer">
-            <button
-              className="btn-secondary"
-              onClick={handleBack}
-              disabled={step === 1 || creating}
-            >
-              ← Back
+        <div className="wizard-footer">
+          <button
+            className="btn-secondary"
+            onClick={handleBack}
+            disabled={step === 1 || creating}
+          >
+            ← Back
+          </button>
+          
+          <div className="footer-actions">
+            <button className="btn-cancel" onClick={onClose} disabled={creating}>
+              Cancel
             </button>
             
-            <div className="footer-actions">
-              <button className="btn-cancel" onClick={onClose} disabled={creating}>
-                Cancel
+            {step < 4 ? (
+              <button
+                className="btn-primary"
+                onClick={handleNext}
+                disabled={!canGoNext()}
+              >
+                Next →
               </button>
-              
-              {step < 4 ? (
-                <button
-                  className="btn-primary"
-                  onClick={handleNext}
-                  disabled={!canGoNext()}
-                >
-                  Next →
-                </button>
-              ) : (
-                <button
-                  className="btn-create"
-                  onClick={handleCreate}
-                  disabled={creating}
-                >
-                  🚀 Create Customer
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-        
-        {step === 5 && creationComplete && (
-          <div className="wizard-footer">
-            <div className="footer-actions" style={{ marginLeft: 'auto' }}>
-              <button className="btn-primary" onClick={onClose}>
-                ✅ Done
+            ) : (
+              <button
+                className="btn-create"
+                onClick={handleCreate}
+                disabled={creating}
+              >
+                {creating ? '⏳ Creating...' : '🚀 Create Customer'}
               </button>
-            </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
+      
+      {/* Provisioning Status Modal (shows after wizard closes) */}
+      {showProvisioningModal && createdCustomerId && (
+        <CustomerProvisioningStatus
+          customerId={createdCustomerId}
+          onClose={() => setShowProvisioningModal(false)}
+        />
+      )}
     </div>
   )
 }
