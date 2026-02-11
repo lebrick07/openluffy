@@ -628,6 +628,7 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
                 'helm/app/templates/_helpers.tpl': 'helm/templates/_helpers.tpl',
                 'helm/app/templates/deployment.yaml': 'helm/templates/deployment.yaml',
                 'helm/app/templates/service.yaml': 'helm/templates/service.yaml',
+                'helm/app/templates/ingress.yaml': 'helm/templates/ingress.yaml',
             },
             'python': {
                 '.github/workflows/ci.yaml': 'ci-python.yaml',
@@ -646,6 +647,7 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
                 'helm/app/templates/_helpers.tpl': 'helm/templates/_helpers.tpl',
                 'helm/app/templates/deployment.yaml': 'helm/templates/deployment.yaml',
                 'helm/app/templates/service.yaml': 'helm/templates/service.yaml',
+                'helm/app/templates/ingress.yaml': 'helm/templates/ingress.yaml',
             },
             'golang': {
                 '.github/workflows/ci.yaml': 'ci-golang.yaml',
@@ -664,6 +666,7 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
                 'helm/app/templates/_helpers.tpl': 'helm/templates/_helpers.tpl',
                 'helm/app/templates/deployment.yaml': 'helm/templates/deployment.yaml',
                 'helm/app/templates/service.yaml': 'helm/templates/service.yaml',
+                'helm/app/templates/ingress.yaml': 'helm/templates/ingress.yaml',
             }
         }
         

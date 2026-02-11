@@ -935,10 +935,19 @@ async def create_customer(params: Dict[str, Any]) -> Dict[str, Any]:
             
             if response.status_code == 200:
                 result = response.json()
+                
+                # Generate application URLs
+                urls = {
+                    "dev": f"http://dev.{customer_id}.local",
+                    "preprod": f"http://preprod.{customer_id}.local",
+                    "prod": f"http://{customer_id}.local"
+                }
+                
                 return {
                     "success": True,
                     "message": f"Customer '{customer_name}' created successfully",
                     "customer_id": customer_id,
+                    "urls": urls,
                     "details": result
                 }
             else:
