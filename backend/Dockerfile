@@ -10,6 +10,8 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/*.py ./
+COPY backend/database ./database
+COPY backend/templates ./templates
 
 EXPOSE 8000
 
