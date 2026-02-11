@@ -437,3 +437,31 @@
     gap: 0.25rem;
   }
 }
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+}
+
+.empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.empty-state h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #c9d1d9;
+  margin: 0 0 0.5rem 0;
+}
+
+.empty-state p {
+  color: #7d8590;
+  font-size: 0.875rem;
+  margin: 0;
+}

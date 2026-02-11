@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
+import { useCustomer } from '../contexts/CustomerContext'
 import './PipelinesView.css'
 
 function PipelinesView() {
+  const { activeCustomer } = useCustomer()
   const [pipelines, setPipelines] = useState([])
   const [selectedPipeline, setSelectedPipeline] = useState(null)
   const [runs, setRuns] = useState(null)
@@ -97,17 +99,37 @@ function PipelinesView() {
     return `${Math.floor(diffMins / 1440)}d ago`
   }
 
+  // Filter pipelines by selected customer
+  const filteredPipelines = activeCustomer
+    ? pipelines.filter(p => p.customer_id === activeCustomer.id)
+    : pipelines
+
   return (
     <div className="pipelines-view-page">
       <div className="pipelines-header">
         <h1>🚀 CI/CD Pipelines</h1>
         <p className="pipelines-subtitle">
-          GitHub Actions workflows and deployment status
+          {activeCustomer 
+            ? `GitHub Actions workflows for ${activeCustomer.name}`
+            : 'GitHub Actions workflows and deployment status'}
         </p>
       </div>
 
-      <div className="pipelines-grid">
-        {pipelines.map(pipeline => (
+      {!activeCustomer ? (
+        <div className="empty-state">
+          <div className="empty-icon">👤</div>
+          <h3>Select a Customer</h3>
+          <p>Choose a customer from the dropdown to view their CI/CD pipelines</p>
+        </div>
+      ) : filteredPipelines.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-icon">🚀</div>
+          <h3>No Pipelines Found</h3>
+          <p>No CI/CD workflows configured for {activeCustomer.name}</p>
+        </div>
+      ) : (
+        <div className="pipelines-grid">
+          {filteredPipelines.map(pipeline => (
           <div 
             key={pipeline.customer_id}
             className={`pipeline-card ${getStatusClass(pipeline.status, pipeline.conclusion)}`}
@@ -155,7 +177,8 @@ function PipelinesView() {
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
       {selectedPipeline && runs && (
         <div className="pipeline-modal" onClick={() => {setSelectedPipeline(null); setRuns(null); setJobs(null);}}>

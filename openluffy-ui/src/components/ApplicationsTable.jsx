@@ -113,7 +113,10 @@ function ApplicationsTable({ selectedEnvironment }) {
           {filtered.length === 0 ? (
             <tr>
               <td colSpan="9" className="no-data">
-                No applications match the current filters
+                {!activeCustomer 
+                  ? '👤 Select a customer from the dropdown to view their applications'
+                  : `No applications found for ${activeCustomer.name}${selectedEnvironment !== 'all' ? ` in ${selectedEnvironment} environment` : ''}`
+                }
               </td>
             </tr>
           ) : (

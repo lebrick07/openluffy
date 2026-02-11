@@ -80,7 +80,12 @@ function PendingApprovals() {
         <h3>🔔 Pending Approvals</h3>
         <div className="no-approvals-message">
           <span className="check-icon">✓</span>
-          <p>All environments in sync. No pending approvals.</p>
+          <p>
+            {!activeCustomer 
+              ? 'Select a customer to view their pending approvals'
+              : `All environments in sync for ${activeCustomer.name}. No pending approvals.`
+            }
+          </p>
         </div>
       </div>
     )
