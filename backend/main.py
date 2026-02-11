@@ -261,11 +261,12 @@ def luffy_action(request: LuffyActionRequest):
 
 @app.get("/customers")
 def get_customers():
-    """Get all customer deployments with multi-environment support"""
+    """Get all customer deployments with multi-environment support - dynamically discovered"""
     if not k8s_available:
         return {'error': 'K8s not available', 'customers': [], 'total': 0}
     
     customers = []
+    customer_map = {}  # {customer_id: {metadata}}
     
     # Helper function to get environment status
     def get_env_status(customer_id, env):
@@ -278,48 +279,82 @@ def get_customers():
                 'environment': env,
                 'status': 'running' if running > 0 else 'error',
                 'pods': {'running': running, 'total': total},
-                'url': f'http://{customer_id}-{env}.local'
+                'url': f'http://{customer_id}-{env}.local' if env == 'prod' else f'http://{env}.{customer_id}.local'
             }
         except:
             return {
                 'environment': env,
                 'status': 'error',
                 'pods': {'running': 0, 'total': 0},
-                'url': f'http://{customer_id}-{env}.local'
+                'url': f'http://{customer_id}-{env}.local' if env == 'prod' else f'http://{env}.{customer_id}.local'
             }
     
-    # Acme Corp
-    acme_envs = [get_env_status('acme-corp', env) for env in ['dev', 'preprod', 'prod']]
-    customers.append({
-        'id': 'acme-corp',
-        'name': 'Acme Corp',
-        'app': 'acme-corp-api',
-        'stack': 'Node.js',
-        'environments': acme_envs,
-        'overallStatus': 'running' if any(e['status'] == 'running' for e in acme_envs) else 'error'
-    })
+    # Discover customer namespaces by scanning K8s
+    try:
+        all_namespaces = v1.list_namespace()
+        
+        for ns in all_namespaces.items:
+            ns_name = ns.metadata.name
+            labels = ns.metadata.labels or {}
+            
+            # Check if this is a customer namespace (has 'customer' label or matches pattern)
+            customer_id = None
+            env = None
+            
+            if 'customer' in labels and 'environment' in labels:
+                # Namespace created by OpenLuffy (has our labels)
+                customer_id = labels['customer']
+                env = labels['environment']
+            elif '-dev' in ns_name or '-preprod' in ns_name or '-prod' in ns_name:
+                # Legacy namespace (pattern-based: customer-id-env)
+                if ns_name.endswith('-dev'):
+                    customer_id = ns_name.replace('-dev', '')
+                    env = 'dev'
+                elif ns_name.endswith('-preprod'):
+                    customer_id = ns_name.replace('-preprod', '')
+                    env = 'preprod'
+                elif ns_name.endswith('-prod'):
+                    customer_id = ns_name.replace('-prod', '')
+                    env = 'prod'
+            
+            if customer_id and env:
+                if customer_id not in customer_map:
+                    # Try to get customer metadata from integrations or namespace labels
+                    customer_name = labels.get('customer-name', customer_id.replace('-', ' ').title())
+                    
+                    # Check if we have integration data for this customer
+                    github_config = integrations_store.get(customer_id, {}).get('github', {})
+                    repo_name = github_config.get('repo', f'{customer_id}-app')
+                    
+                    # Detect stack from repo or namespace labels
+                    stack = labels.get('stack', 'Unknown')
+                    if 'node' in repo_name or 'api' in repo_name:
+                        stack = 'Node.js'
+                    elif 'webapp' in repo_name or 'fastapi' in repo_name:
+                        stack = 'Python'
+                    elif 'go' in repo_name:
+                        stack = 'Go'
+                    
+                    customer_map[customer_id] = {
+                        'id': customer_id,
+                        'name': customer_name,
+                        'app': repo_name,
+                        'stack': stack,
+                        'environments': []
+                    }
     
-    # TechStart
-    techstart_envs = [get_env_status('techstart', env) for env in ['dev', 'preprod', 'prod']]
-    customers.append({
-        'id': 'techstart',
-        'name': 'TechStart Inc',
-        'app': 'techstart-webapp',
-        'stack': 'Python FastAPI',
-        'environments': techstart_envs,
-        'overallStatus': 'running' if any(e['status'] == 'running' for e in techstart_envs) else 'error'
-    })
+    except Exception as e:
+        print(f"Error discovering customer namespaces: {e}")
+        # Fall back to empty list - no customers found
+        return {'customers': [], 'total': 0}
     
-    # WidgetCo
-    widgetco_envs = [get_env_status('widgetco', env) for env in ['dev', 'preprod', 'prod']]
-    customers.append({
-        'id': 'widgetco',
-        'name': 'WidgetCo Manufacturing',
-        'app': 'widgetco-api',
-        'stack': 'Go',
-        'environments': widgetco_envs,
-        'overallStatus': 'running' if any(e['status'] == 'running' for e in widgetco_envs) else 'error'
-    })
+    # Build environment status for each discovered customer
+    for customer_id in customer_map:
+        envs = [get_env_status(customer_id, env) for env in ['dev', 'preprod', 'prod']]
+        customer_map[customer_id]['environments'] = envs
+        customer_map[customer_id]['overallStatus'] = 'running' if any(e['status'] == 'running' for e in envs) else 'error'
+    
+    customers = list(customer_map.values())
     
     return {'customers': customers, 'total': len(customers)}
 
@@ -488,7 +523,9 @@ async def create_customer(request: Request):
                                 name=namespace_name,
                                 labels={
                                     'customer': customer_id,
+                                    'customer-name': customer_name,
                                     'environment': env,
+                                    'stack': stack,
                                     'managed-by': 'openluffy'
                                 }
                             )
@@ -521,38 +558,67 @@ async def create_customer(request: Request):
 
 @app.get("/deployments")
 def get_deployments():
-    """Get all deployments across all customer namespaces and environments"""
+    """Get all deployments across all customer namespaces and environments - dynamically discovered"""
     if not k8s_available:
         return {'error': 'K8s not available', 'deployments': [], 'total': 0}
     
     deployments = []
-    customers = ['acme-corp', 'techstart', 'widgetco']
-    environments = ['dev', 'preprod', 'prod']
     
-    for customer in customers:
-        for env in environments:
-            ns = f"{customer}-{env}"
-            try:
-                deploys = apps_v1.list_namespaced_deployment(ns)
-                
-                for deploy in deploys.items:
-                    name = deploy.metadata.name
-                    replicas = deploy.status.replicas or 0
-                    ready = deploy.status.ready_replicas or 0
+    # Discover all customer namespaces dynamically
+    try:
+        all_namespaces = v1.list_namespace()
+        
+        for ns_obj in all_namespaces.items:
+            ns_name = ns_obj.metadata.name
+            labels = ns_obj.metadata.labels or {}
+            
+            # Check if this is a customer namespace
+            customer_id = None
+            env = None
+            
+            if 'customer' in labels and 'environment' in labels:
+                # Namespace created by OpenLuffy (has our labels)
+                customer_id = labels['customer']
+                env = labels['environment']
+            elif '-dev' in ns_name or '-preprod' in ns_name or '-prod' in ns_name:
+                # Legacy namespace (pattern-based: customer-id-env)
+                if ns_name.endswith('-dev'):
+                    customer_id = ns_name.replace('-dev', '')
+                    env = 'dev'
+                elif ns_name.endswith('-preprod'):
+                    customer_id = ns_name.replace('-preprod', '')
+                    env = 'preprod'
+                elif ns_name.endswith('-prod'):
+                    customer_id = ns_name.replace('-prod', '')
+                    env = 'prod'
+            
+            if customer_id and env:
+                # Get deployments from this namespace
+                try:
+                    deploys = apps_v1.list_namespaced_deployment(ns_name)
                     
-                    deployments.append({
-                        'id': f"{ns}-{name}",
-                        'name': name,
-                        'namespace': ns,
-                        'customer': customer,
-                        'environment': env,
-                        'replicas': replicas,
-                        'ready': ready,
-                        'status': 'running' if ready == replicas and ready > 0 else 'degraded',
-                        'image': deploy.spec.template.spec.containers[0].image
-                    })
-            except ApiException:
-                pass
+                    for deploy in deploys.items:
+                        name = deploy.metadata.name
+                        replicas = deploy.status.replicas or 0
+                        ready = deploy.status.ready_replicas or 0
+                        
+                        deployments.append({
+                            'id': f"{ns_name}-{name}",
+                            'name': name,
+                            'namespace': ns_name,
+                            'customer': customer_id,
+                            'environment': env,
+                            'replicas': replicas,
+                            'ready': ready,
+                            'status': 'running' if ready == replicas and ready > 0 else 'degraded',
+                            'image': deploy.spec.template.spec.containers[0].image
+                        })
+                except ApiException as e:
+                    # Namespace exists but no deployments or access denied
+                    pass
+    
+    except Exception as e:
+        print(f"Error discovering deployments: {e}")
     
     return {'deployments': deployments, 'total': len(deployments)}
 
