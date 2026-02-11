@@ -234,7 +234,7 @@ def get_tools() -> List[Dict[str, Any]]:
         },
         {
             "name": "create_customer",
-            "description": "Create a new customer in OpenLuffy with GitHub repo and ArgoCD applications. Smart defaults: ID auto-generated from name, GitHub org defaults to 'lebrick07', repo defaults to '{id}-api', ArgoCD URL defaults to 'http://argocd.local'. Only GitHub token is required.",
+            "description": "Create a new customer in OpenLuffy with GitHub repo and ArgoCD applications. IMPORTANT: DO NOT call this tool until you have confirmed details with the user AND received both GitHub token and ArgoCD token. Show smart defaults first (ID auto-generated from name, GitHub org='lebrick07', repo='{id}-api', ArgoCD URL='http://argocd.local'), then ask user to provide tokens. Only call this tool AFTER user provides tokens.",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -865,8 +865,20 @@ async def create_customer(params: Dict[str, Any]) -> Dict[str, Any]:
         import httpx
         import os
         
-        # Apply smart defaults
-        customer_name = params["name"]
+        # Validate required fields
+        customer_name = params.get("name")
+        if not customer_name:
+            return {
+                "success": False,
+                "error": "Customer name is required. Please provide it and try again."
+            }
+        
+        github_token = params.get("github_token")
+        if not github_token:
+            return {
+                "success": False,
+                "error": "GitHub token is required. I cannot create the customer without it. Please provide a GitHub Personal Access Token with repo permissions."
+            }
         
         # Auto-generate ID from name if not provided
         if "id" not in params or not params["id"]:
@@ -885,13 +897,17 @@ async def create_customer(params: Dict[str, Any]) -> Dict[str, Any]:
         stack = params.get("stack", "nodejs")
         github_org = params.get("github_org", "lebrick07")
         github_repo = params.get("github_repo", f"{customer_id}-api")
-        github_token = params["github_token"]  # Required
         argocd_url = params.get("argocd_url", "http://argocd.local")
         
         # ArgoCD token - try to get from env if not provided
         argocd_token = params.get("argocd_token")
         if not argocd_token:
             argocd_token = os.getenv("ARGOCD_TOKEN", "")
+            if not argocd_token:
+                return {
+                    "success": False,
+                    "error": "ArgoCD token is required. Please provide it or ensure ARGOCD_TOKEN environment variable is set."
+                }
         
         # Build payload
         payload = {
