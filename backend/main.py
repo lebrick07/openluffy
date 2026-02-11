@@ -833,7 +833,66 @@ async def create_customer(request: Request):
                 'error': f'Failed to check GitHub repository: {repo_response.status_code}'
             })
         
-        # Step 2: Store integrations
+        # Step 2: Create Customer record in database
+        if db_available:
+            try:
+                from database import SessionLocal
+                db = SessionLocal()
+                try:
+                    # Check if customer already exists
+                    existing_customer = db.query(Customer).filter(Customer.id == customer_id).first()
+                    if not existing_customer:
+                        customer = Customer(
+                            id=customer_id,
+                            name=customer_name,
+                            stack=stack
+                        )
+                        db.add(customer)
+                        db.commit()
+                        print(f"✅ Created customer record: {customer_name} ({customer_id})")
+                    else:
+                        print(f"ℹ️  Customer record already exists: {customer_name} ({customer_id})")
+                except Exception as db_error:
+                    db.rollback()
+                    print(f"⚠️  Failed to create customer record: {db_error}")
+                finally:
+                    db.close()
+            except Exception as e:
+                print(f"Database error: {e}")
+        
+        # Step 3: Store integrations (database + in-memory)
+        if db_available:
+            try:
+                from database import SessionLocal
+                db = SessionLocal()
+                try:
+                    # Create GitHub integration
+                    github_integration = Integration(
+                        customer_id=customer_id,
+                        type='github',
+                        config=github
+                    )
+                    db.add(github_integration)
+                    
+                    # Create ArgoCD integration
+                    argocd_integration = Integration(
+                        customer_id=customer_id,
+                        type='argocd',
+                        config=argocd
+                    )
+                    db.add(argocd_integration)
+                    
+                    db.commit()
+                    print(f"✅ Created integrations for {customer_id}")
+                except Exception as db_error:
+                    db.rollback()
+                    print(f"⚠️  Failed to create integrations: {db_error}")
+                finally:
+                    db.close()
+            except Exception as e:
+                print(f"Database error: {e}")
+        
+        # Also store in memory (backward compatibility)
         if customer_id not in integrations_store:
             integrations_store[customer_id] = {}
         
@@ -841,7 +900,7 @@ async def create_customer(request: Request):
         integrations_store[customer_id]['argocd'] = argocd
         save_integrations()  # Persist to disk
         
-        # Step 3: Create K8s namespaces (if k8s available)
+        # Step 4: Create K8s namespaces (if k8s available)
         namespaces_created = []
         if k8s_available:
             try:
@@ -874,7 +933,7 @@ async def create_customer(request: Request):
                 print(f"K8s namespace creation error: {k8s_error}")
                 result['k8s']['error'] = str(k8s_error)
         
-        # Step 4: Create ArgoCD applications (placeholder - would need ArgoCD API)
+        # Step 5: Create ArgoCD applications (placeholder - would need ArgoCD API)
         result['argocd']['applications'] = [
             f"{customer_id}-dev",
             f"{customer_id}-preprod",
@@ -882,7 +941,7 @@ async def create_customer(request: Request):
         ]
         result['argocd']['message'] = 'ArgoCD applications configured (manual sync required)'
         
-        # Step 5: Push CI/CD templates to GitHub repo
+        # Step 6: Push CI/CD templates to GitHub repo
         template_result = initialize_customer_repo(customer_id, customer_name, stack, github)
         result['github'].update(template_result)
         
@@ -969,6 +1028,190 @@ async def reinitialize_customer_repo(customer_id: str, request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={'error': str(e)})
 
+@app.delete("/customers/{customer_id}")
+async def delete_customer(customer_id: str, request: Request, db: Session = Depends(get_db)):
+    """
+    Delete a customer and destroy all their environments
+    
+    Query params:
+    - delete_repo=true: Also delete the GitHub repository (default: false, archives instead)
+    - confirm=customer-id: Safety confirmation (required)
+    
+    This will:
+    1. Delete ArgoCD applications (dev, preprod, prod)
+    2. Delete K8s namespaces (dev, preprod, prod) 
+    3. Archive or delete GitHub repository
+    4. Delete customer record from database
+    5. Remove all integrations
+    """
+    try:
+        query_params = dict(request.query_params)
+        delete_repo = query_params.get('delete_repo', 'false').lower() == 'true'
+        confirmation = query_params.get('confirm', '')
+        
+        # Safety check: require confirmation
+        if confirmation != customer_id:
+            return JSONResponse(status_code=400, content={
+                'error': 'Confirmation required',
+                'message': f'Add ?confirm={customer_id} to confirm deletion'
+            })
+        
+        result = {
+            'success': True,
+            'customer_id': customer_id,
+            'deleted': {
+                'argocd_apps': [],
+                'k8s_namespaces': [],
+                'github_repo': None,
+                'integrations': [],
+                'database_record': False
+            },
+            'errors': []
+        }
+        
+        # Step 1: Get customer integrations
+        github_config = None
+        argocd_config = None
+        
+        if db_available:
+            try:
+                # Get GitHub integration
+                github_integration = db.query(Integration).filter(
+                    Integration.customer_id == customer_id,
+                    Integration.type == 'github'
+                ).first()
+                
+                if github_integration:
+                    github_config = github_integration.config
+                
+                # Get ArgoCD integration
+                argocd_integration = db.query(Integration).filter(
+                    Integration.customer_id == customer_id,
+                    Integration.type == 'argocd'
+                ).first()
+                
+                if argocd_integration:
+                    argocd_config = argocd_integration.config
+            except Exception as e:
+                result['errors'].append(f'Database query failed: {e}')
+        
+        # Fall back to in-memory store
+        if not github_config and customer_id in integrations_store:
+            github_config = integrations_store[customer_id].get('github')
+            argocd_config = integrations_store[customer_id].get('argocd')
+        
+        # Step 2: Delete ArgoCD applications
+        if k8s_available:
+            try:
+                from kubernetes import client
+                custom_api = client.CustomObjectsApi()
+                
+                for env in ['dev', 'preprod', 'prod']:
+                    app_name = f"{customer_id}-{env}"
+                    try:
+                        custom_api.delete_namespaced_custom_object(
+                            group="argoproj.io",
+                            version="v1alpha1",
+                            namespace="argocd",
+                            plural="applications",
+                            name=app_name
+                        )
+                        result['deleted']['argocd_apps'].append(app_name)
+                    except Exception as e:
+                        if '404' not in str(e):  # Ignore if doesn't exist
+                            result['errors'].append(f'Failed to delete ArgoCD app {app_name}: {e}')
+            except Exception as e:
+                result['errors'].append(f'ArgoCD deletion error: {e}')
+        
+        # Step 3: Delete K8s namespaces
+        if k8s_available:
+            try:
+                for env in ['dev', 'preprod', 'prod']:
+                    namespace_name = f"{customer_id}-{env}"
+                    try:
+                        v1.delete_namespace(namespace_name)
+                        result['deleted']['k8s_namespaces'].append(namespace_name)
+                    except Exception as e:
+                        if '404' not in str(e):  # Ignore if doesn't exist
+                            result['errors'].append(f'Failed to delete namespace {namespace_name}: {e}')
+            except Exception as e:
+                result['errors'].append(f'K8s namespace deletion error: {e}')
+        
+        # Step 4: Archive or delete GitHub repository
+        if github_config:
+            try:
+                import requests
+                
+                org = github_config.get('org')
+                repo = github_config.get('repo')
+                token = github_config.get('token')
+                
+                if delete_repo:
+                    # Permanently delete repository
+                    delete_url = f"https://api.github.com/repos/{org}/{repo}"
+                    delete_response = requests.delete(delete_url, headers={
+                        'Authorization': f"token {token}",
+                        'Accept': 'application/vnd.github.v3+json'
+                    })
+                    
+                    if delete_response.ok or delete_response.status_code == 404:
+                        result['deleted']['github_repo'] = f'Deleted: {org}/{repo}'
+                    else:
+                        result['errors'].append(f'Failed to delete repo: {delete_response.json().get("message", "Unknown error")}')
+                else:
+                    # Archive repository (safer)
+                    archive_url = f"https://api.github.com/repos/{org}/{repo}"
+                    archive_response = requests.patch(archive_url, json={'archived': True}, headers={
+                        'Authorization': f"token {token}",
+                        'Accept': 'application/vnd.github.v3+json'
+                    })
+                    
+                    if archive_response.ok:
+                        result['deleted']['github_repo'] = f'Archived: {org}/{repo}'
+                    else:
+                        result['errors'].append(f'Failed to archive repo: {archive_response.json().get("message", "Unknown error")}')
+            except Exception as e:
+                result['errors'].append(f'GitHub repo deletion error: {e}')
+        
+        # Step 5: Delete integrations from database
+        if db_available:
+            try:
+                deleted_count = db.query(Integration).filter(
+                    Integration.customer_id == customer_id
+                ).delete()
+                
+                result['deleted']['integrations'] = [f'{deleted_count} integrations']
+                db.commit()
+            except Exception as e:
+                db.rollback()
+                result['errors'].append(f'Database integration deletion failed: {e}')
+        
+        # Step 6: Delete customer record from database
+        if db_available:
+            try:
+                customer = db.query(Customer).filter(Customer.id == customer_id).first()
+                if customer:
+                    db.delete(customer)
+                    db.commit()
+                    result['deleted']['database_record'] = True
+                else:
+                    result['errors'].append('Customer record not found in database')
+            except Exception as e:
+                db.rollback()
+                result['errors'].append(f'Database customer deletion failed: {e}')
+        
+        # Step 7: Remove from in-memory store
+        if customer_id in integrations_store:
+            del integrations_store[customer_id]
+            save_integrations()
+        
+        # Determine overall success
+        result['success'] = len(result['errors']) == 0
+        
+        return result
+        
+    except Exception as e:
+        return JSONResponse(status_code=500, content={'error': str(e)})
 @app.get("/deployments")
 def get_deployments():
     """Get all deployments across all customer namespaces and environments - dynamically discovered"""

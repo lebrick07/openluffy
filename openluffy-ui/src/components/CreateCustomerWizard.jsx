@@ -136,7 +136,7 @@ function CreateCustomerWizard({ onClose, onSuccess }) {
       await new Promise(resolve => setTimeout(resolve, 1000))
       
       // Step 3: Call backend
-      const response = await fetch('/api/customers/create', {
+      const response = await fetch('/customers/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
