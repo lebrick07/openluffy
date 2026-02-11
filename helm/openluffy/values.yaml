@@ -7,6 +7,9 @@ backend:
   service:
     type: ClusterIP
     port: 8000
+  storage:
+    size: 1Gi
+    # storageClassName: local-path  # Uncomment for K3s local-path
 
 frontend:
   image:

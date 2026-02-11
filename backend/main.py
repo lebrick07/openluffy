@@ -7,14 +7,45 @@ from pydantic import BaseModel
 from typing import Dict, Any, Optional, List
 import os
 import httpx
+import json
+from pathlib import Path
 from datetime import datetime
 from triage import triage_engine
 from luffy_agent import get_agent
 
 app = FastAPI(title="openluffy")
 
-# In-memory storage for integration configs (TODO: move to K8s secrets or Vault)
+# Persistent storage for integration configs
+INTEGRATIONS_FILE = Path("/data/integrations.json")
 integrations_store: Dict[str, Dict[str, Any]] = {}
+
+def load_integrations():
+    """Load integrations from disk"""
+    global integrations_store
+    if INTEGRATIONS_FILE.exists():
+        try:
+            with open(INTEGRATIONS_FILE, 'r') as f:
+                integrations_store = json.load(f)
+                print(f"✅ Loaded {len(integrations_store)} customer integrations from disk")
+        except Exception as e:
+            print(f"⚠️ Failed to load integrations: {e}")
+            integrations_store = {}
+    else:
+        print("ℹ️ No existing integrations file, starting fresh")
+        integrations_store = {}
+
+def save_integrations():
+    """Save integrations to disk"""
+    try:
+        INTEGRATIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(INTEGRATIONS_FILE, 'w') as f:
+            json.dump(integrations_store, f, indent=2)
+        print(f"💾 Saved integrations to disk ({len(integrations_store)} customers)")
+    except Exception as e:
+        print(f"⚠️ Failed to save integrations: {e}")
+
+# Load integrations on startup
+load_integrations()
 
 app.add_middleware(
     CORSMiddleware,
@@ -321,6 +352,7 @@ async def save_customer_integration(customer_id: str, integration_type: str, req
             integrations_store[customer_id] = {}
         
         integrations_store[customer_id][integration_type] = config
+        save_integrations()  # Persist to disk
         
         return {'success': True, 'message': f'{integration_type} integration saved'}
     except Exception as e:
@@ -341,6 +373,7 @@ def delete_customer_integration(customer_id: str, integration_type: str):
     if not integrations_store[customer_id]:
         del integrations_store[customer_id]
     
+    save_integrations()  # Persist to disk
     return {'success': True, 'message': f'{integration_type} integration removed'}
 
 @app.post("/customers/create")
@@ -440,6 +473,7 @@ async def create_customer(request: Request):
         
         integrations_store[customer_id]['github'] = github
         integrations_store[customer_id]['argocd'] = argocd
+        save_integrations()  # Persist to disk
         
         # Step 3: Create K8s namespaces (if k8s available)
         namespaces_created = []
