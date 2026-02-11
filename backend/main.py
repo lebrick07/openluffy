@@ -55,26 +55,44 @@ load_integrations()
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database on startup"""
+    """Initialize database on startup with retry logic"""
     global db_available
+    import time
     
     # Check if DATABASE_URL is set
     database_url = os.getenv('DATABASE_URL')
     if database_url:
         print(f"🗄️ Database URL configured: {database_url.split('@')[0]}@...")  # Hide credentials
-        try:
-            init_db()
-            if check_db_connection():
-                db_available = True
-                print("✅ Database connection successful")
+        
+        # Retry logic: wait for database to be fully ready
+        max_retries = 30  # 30 retries * 2s = 60s max wait
+        retry_delay = 2
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                print(f"📊 Database connection attempt {attempt}/{max_retries}...")
+                init_db()
                 
-                # Migrate existing integrations_store to database
-                await migrate_integrations_to_db()
-            else:
-                print("⚠️ Database connection failed - falling back to file storage")
-        except Exception as e:
-            print(f"⚠️ Database initialization failed: {e}")
-            print("ℹ️ Falling back to file storage")
+                if check_db_connection():
+                    db_available = True
+                    print("✅ Database connection successful")
+                    
+                    # Migrate existing integrations_store to database
+                    await migrate_integrations_to_db()
+                    break
+                else:
+                    raise Exception("Connection check failed")
+                    
+            except Exception as e:
+                if attempt < max_retries:
+                    print(f"⚠️ Database not ready yet: {e}")
+                    print(f"⏳ Retrying in {retry_delay}s... ({attempt}/{max_retries})")
+                    time.sleep(retry_delay)
+                else:
+                    print(f"❌ Database initialization failed after {max_retries} attempts")
+                    print(f"⚠️ Error: {e}")
+                    print("ℹ️ Falling back to file storage")
+                    break
     else:
         print("ℹ️ DATABASE_URL not set - using file storage")
 
