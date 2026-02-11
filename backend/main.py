@@ -933,13 +933,99 @@ async def create_customer(request: Request):
                 print(f"K8s namespace creation error: {k8s_error}")
                 result['k8s']['error'] = str(k8s_error)
         
-        # Step 5: Create ArgoCD applications (placeholder - would need ArgoCD API)
-        result['argocd']['applications'] = [
-            f"{customer_id}-dev",
-            f"{customer_id}-preprod",
-            f"{customer_id}-prod"
-        ]
-        result['argocd']['message'] = 'ArgoCD applications configured (manual sync required)'
+        # Step 5: Create ArgoCD applications
+        argocd_apps_created = []
+        argocd_errors = []
+        
+        if k8s_available:
+            try:
+                from kubernetes import client
+                custom_api = client.CustomObjectsApi()
+                
+                environments = [
+                    {'name': 'dev', 'auto_sync': True, 'values_file': 'values/dev.yaml'},
+                    {'name': 'preprod', 'auto_sync': True, 'values_file': 'values/preprod.yaml'},
+                    {'name': 'prod', 'auto_sync': False, 'values_file': 'values/prod.yaml'}
+                ]
+                
+                for env in environments:
+                    app_name = f"{customer_id}-{env['name']}"
+                    namespace = f"{customer_id}-{env['name']}"
+                    
+                    argocd_app = {
+                        'apiVersion': 'argoproj.io/v1alpha1',
+                        'kind': 'Application',
+                        'metadata': {
+                            'name': app_name,
+                            'namespace': 'argocd',
+                            'finalizers': ['resources-finalizer.argocd.argoproj.io'],
+                            'labels': {
+                                'customer': customer_id,
+                                'environment': env['name'],
+                                'managed-by': 'openluffy'
+                            }
+                        },
+                        'spec': {
+                            'project': 'default',
+                            'source': {
+                                'repoURL': f"https://github.com/{github['org']}/{github['repo']}.git",
+                                'targetRevision': github.get('branch', 'main'),
+                                'path': 'k8s'
+                            },
+                            'destination': {
+                                'server': 'https://kubernetes.default.svc',
+                                'namespace': namespace
+                            },
+                            'syncPolicy': {
+                                'automated': {
+                                    'prune': env['auto_sync'],
+                                    'selfHeal': env['auto_sync']
+                                } if env['auto_sync'] else None,
+                                'syncOptions': ['CreateNamespace=true'],
+                                'retry': {
+                                    'limit': 5,
+                                    'backoff': {
+                                        'duration': '5s',
+                                        'factor': 2,
+                                        'maxDuration': '3m'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    try:
+                        custom_api.create_namespaced_custom_object(
+                            group='argoproj.io',
+                            version='v1alpha1',
+                            namespace='argocd',
+                            plural='applications',
+                            body=argocd_app
+                        )
+                        argocd_apps_created.append(app_name)
+                        print(f"✅ Created ArgoCD app: {app_name}")
+                    except Exception as app_error:
+                        if '409' in str(app_error):  # Already exists
+                            argocd_apps_created.append(f"{app_name} (already exists)")
+                        else:
+                            error_msg = f"Failed to create {app_name}: {str(app_error)}"
+                            argocd_errors.append(error_msg)
+                            print(f"❌ {error_msg}")
+                
+                result['argocd']['applications'] = argocd_apps_created
+                if argocd_errors:
+                    result['argocd']['errors'] = argocd_errors
+                    result['argocd']['message'] = f'Created {len(argocd_apps_created)} apps with {len(argocd_errors)} errors'
+                else:
+                    result['argocd']['message'] = f'Successfully created {len(argocd_apps_created)} ArgoCD applications'
+                    
+            except Exception as argocd_error:
+                result['argocd']['error'] = str(argocd_error)
+                result['argocd']['message'] = 'Failed to create ArgoCD applications'
+                print(f"ArgoCD creation error: {argocd_error}")
+        else:
+            result['argocd']['applications'] = []
+            result['argocd']['message'] = 'K8s not available - ArgoCD apps not created'
         
         # Step 6: Push CI/CD templates to GitHub repo
         template_result = initialize_customer_repo(customer_id, customer_name, stack, github)
