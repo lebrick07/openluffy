@@ -316,7 +316,7 @@ function IntegrationsDashboard() {
           'Branch': config.branch || 'main',
           'Customer': activeCustomer.name
         },
-        actions: ['View Repo', 'Workflows', 'Configure', 'Remove'],
+        actions: ['View Repo', 'Workflows', 'Reinitialize', 'Configure', 'Remove'],
         url: repoUrl,
         config: config
       }
@@ -465,6 +465,8 @@ function IntegrationsDashboard() {
       window.open(integration.url, '_blank')
     } else if (action === 'View Repo' && integration.url) {
       window.open(integration.url, '_blank')
+    } else if (action === 'Reinitialize') {
+      handleReinitialize(integration)
     } else if (action === 'Configure') {
       handleConfigure(integration)
     } else if (action === 'Remove') {
@@ -505,6 +507,40 @@ function IntegrationsDashboard() {
       fetchConnectedIntegrations()
     } catch (error) {
       alert(`Failed to remove integration: ${error.message}`)
+    }
+  }
+
+  const handleReinitialize = async (integration) => {
+    if (!activeCustomer || integration.id !== 'github') return
+    
+    if (!confirm(`Reinitialize GitHub repository for ${activeCustomer.name}?\n\nThis will push 8 template files (workflow, Dockerfile, app code, K8s manifests) to the repository. Existing files will be updated.`)) {
+      return
+    }
+    
+    try {
+      const response = await fetch(`/api/customers/${activeCustomer.id}/reinitialize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to reinitialize repository')
+      }
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        alert(`✅ Repository reinitialized successfully!\n\n${result.templates_pushed.length} files pushed:\n${result.templates_pushed.map(f => `  • ${f}`).join('\n')}\n\nStack: ${result.stack}`)
+      } else {
+        alert(`⚠️ Reinitialize completed with errors:\n\n✅ Pushed: ${result.templates_pushed.length} files\n❌ Errors: ${result.errors.length}\n\n${result.errors.join('\n')}`)
+      }
+      
+      // Refresh integrations list
+      fetchConnectedIntegrations()
+    } catch (error) {
+      alert(`Failed to reinitialize repository: ${error.message}`)
     }
   }
 

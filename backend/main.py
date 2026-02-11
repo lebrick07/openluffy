@@ -574,6 +574,158 @@ def delete_customer_integration(customer_id: str, integration_type: str, db: Ses
     
     return {'success': True, 'message': f'{integration_type} integration removed'}
 
+def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, github: dict) -> dict:
+    """
+    Initialize a customer GitHub repo with CI/CD templates
+    
+    Args:
+        customer_id: Customer ID (e.g., 'acme-corp')
+        customer_name: Display name (e.g., 'Acme Corp')
+        stack: Tech stack (nodejs/python/golang)
+        github: GitHub config dict with org, repo, token, branch
+    
+    Returns:
+        dict with templates_pushed list and message
+    """
+    import requests
+    import base64
+    from pathlib import Path
+    
+    result = {'templates_pushed': [], 'message': '', 'errors': []}
+    
+    try:
+        templates_dir = Path(__file__).parent / 'templates'
+        
+        # Map stack to template files
+        stack_templates = {
+            'nodejs': {
+                '.github/workflows/ci.yaml': 'workflow-nodejs.yaml',
+                'Dockerfile': 'Dockerfile-nodejs',
+                'index.js': 'app-nodejs.js',
+                'package.json': 'package.json',
+                '.gitignore': 'gitignore',
+                'README.md': 'README.md',
+                'k8s/deployment.yaml': 'k8s-deployment.yaml',
+                'k8s/service.yaml': 'k8s-service.yaml',
+            },
+            'python': {
+                '.github/workflows/ci.yaml': 'workflow-python.yaml',
+                'Dockerfile': 'Dockerfile-python',
+                'app.py': 'app-python.py',
+                'requirements.txt': 'requirements.txt',
+                '.gitignore': 'gitignore',
+                'README.md': 'README.md',
+                'k8s/deployment.yaml': 'k8s-deployment.yaml',
+                'k8s/service.yaml': 'k8s-service.yaml',
+            },
+            'golang': {
+                '.github/workflows/ci.yaml': 'workflow-golang.yaml',
+                'Dockerfile': 'Dockerfile-golang',
+                'main.go': 'app-golang.go',
+                'go.mod': 'go.mod',
+                '.gitignore': 'gitignore',
+                'README.md': 'README.md',
+                'k8s/deployment.yaml': 'k8s-deployment.yaml',
+                'k8s/service.yaml': 'k8s-service.yaml',
+            }
+        }
+        
+        # Stack-specific instructions for README
+        stack_instructions = {
+            'nodejs': '''```bash
+npm install
+npm start
+```
+
+Visit: http://localhost:3000''',
+            'python': '''```bash
+pip install -r requirements.txt
+python main.py
+```
+
+Visit: http://localhost:8000''',
+            'go': '''```bash
+go mod download
+go run main.go
+```
+
+Visit: http://localhost:8080'''
+        }
+        
+        if stack not in stack_templates:
+            result['errors'].append(f'Unknown stack: {stack}')
+            return result
+        
+        for target_path, template_file in stack_templates[stack].items():
+            template_path = templates_dir / template_file
+            
+            if not template_path.exists():
+                result['errors'].append(f'Template not found: {template_file}')
+                continue
+            
+            # Read template content
+            with open(template_path, 'r') as f:
+                content = f.read()
+            
+            # Replace placeholders
+            stack_info = {
+                'nodejs': {'framework': 'Express.js', 'port': '3000'},
+                'python': {'framework': 'FastAPI', 'port': '8000'},
+                'golang': {'framework': 'net/http', 'port': '8080'},
+            }
+            
+            info = stack_info.get(stack, {'framework': 'Unknown', 'port': '8000'})
+            
+            content = content.replace('{{CUSTOMER_ID}}', customer_id)
+            content = content.replace('{{CUSTOMER_NAME}}', customer_name)
+            content = content.replace('{{GITHUB_OWNER}}', github['org'])
+            content = content.replace('{{REPO_NAME}}', github['repo'])
+            content = content.replace('{{STACK}}', stack.title())
+            content = content.replace('{{FRAMEWORK}}', info['framework'])
+            content = content.replace('{{PORT}}', info['port'])
+            content = content.replace('{{APP_NAME}}', github['repo'])
+            content = content.replace('{{NAMESPACE}}', f"{customer_id}-dev")
+            content = content.replace('{{ENVIRONMENT}}', 'development')
+            content = content.replace('{{STACK_SETUP}}', stack_instructions.get(stack, ''))
+            
+            # Push file to GitHub using GitHub API
+            file_url = f"https://api.github.com/repos/{github['org']}/{github['repo']}/contents/{target_path}"
+            
+            # Check if file exists
+            check_response = requests.get(file_url, headers={
+                'Authorization': f"token {github['token']}",
+                'Accept': 'application/vnd.github.v3+json'
+            })
+            
+            file_data = {
+                'message': f'Add {target_path} via OpenLuffy',
+                'content': base64.b64encode(content.encode()).decode(),
+                'branch': github.get('branch', 'main')
+            }
+            
+            if check_response.status_code == 200:
+                # File exists, update it
+                existing_file = check_response.json()
+                file_data['sha'] = existing_file['sha']
+            
+            # Create or update file
+            push_response = requests.put(file_url, json=file_data, headers={
+                'Authorization': f"token {github['token']}",
+                'Accept': 'application/vnd.github.v3+json'
+            })
+            
+            if push_response.ok:
+                result['templates_pushed'].append(target_path)
+            else:
+                result['errors'].append(f'Failed to push {target_path}: {push_response.status_code}')
+        
+        result['message'] = f'Repository initialized with {len(result["templates_pushed"])} files'
+        
+    except Exception as e:
+        result['errors'].append(f'Exception: {str(e)}')
+    
+    return result
+
 @app.post("/customers/create")
 async def create_customer(request: Request):
     """
@@ -715,142 +867,88 @@ async def create_customer(request: Request):
         result['argocd']['message'] = 'ArgoCD applications configured (manual sync required)'
         
         # Step 5: Push CI/CD templates to GitHub repo
-        try:
-            from pathlib import Path
-            import base64
-            
-            templates_dir = Path(__file__).parent / 'templates'
-            
-            # Map stack to template files
-            stack_templates = {
-                'nodejs': {
-                    '.github/workflows/ci.yaml': 'workflow-nodejs.yaml',
-                    'Dockerfile': 'Dockerfile-nodejs',
-                    'index.js': 'app-nodejs.js',
-                    'package.json': 'package.json',
-                    '.gitignore': 'gitignore',
-                    'README.md': 'README.md',
-                    'k8s/deployment.yaml': 'k8s-deployment.yaml',
-                    'k8s/service.yaml': 'k8s-service.yaml',
-                },
-                'python': {
-                    '.github/workflows/ci.yaml': 'workflow-python.yaml',
-                    'Dockerfile': 'Dockerfile-python',
-                    'app.py': 'app-python.py',
-                    'requirements.txt': 'requirements.txt',
-                    '.gitignore': 'gitignore',
-                    'README.md': 'README.md',
-                    'k8s/deployment.yaml': 'k8s-deployment.yaml',
-                    'k8s/service.yaml': 'k8s-service.yaml',
-                },
-                'golang': {
-                    '.github/workflows/ci.yaml': 'workflow-golang.yaml',
-                    'Dockerfile': 'Dockerfile-golang',
-                    'main.go': 'app-golang.go',
-                    'go.mod': 'go.mod',
-                    '.gitignore': 'gitignore',
-                    'README.md': 'README.md',
-                    'k8s/deployment.yaml': 'k8s-deployment.yaml',
-                    'k8s/service.yaml': 'k8s-service.yaml',
-                }
-            }
-            
-            # Stack-specific instructions for README
-            stack_instructions = {
-                'nodejs': '''```bash
-npm install
-npm start
-```
-
-Visit: http://localhost:3000''',
-                'python': '''```bash
-pip install -r requirements.txt
-python main.py
-```
-
-Visit: http://localhost:8000''',
-                'go': '''```bash
-go mod download
-go run main.go
-```
-
-Visit: http://localhost:8080'''
-            }
-            
-            if stack in stack_templates:
-                files_pushed = []
-                
-                for target_path, template_file in stack_templates[stack].items():
-                    template_path = templates_dir / template_file
-                    
-                    if not template_path.exists():
-                        print(f"Template not found: {template_path}")
-                        continue
-                    
-                    # Read template content
-                    with open(template_path, 'r') as f:
-                        content = f.read()
-                    
-                    # Replace placeholders
-                    stack_info = {
-                        'nodejs': {'framework': 'Express.js', 'port': '3000'},
-                        'python': {'framework': 'FastAPI', 'port': '8000'},
-                        'golang': {'framework': 'net/http', 'port': '8080'},
-                    }
-                    
-                    info = stack_info.get(stack, {'framework': 'Unknown', 'port': '8000'})
-                    
-                    content = content.replace('{{CUSTOMER_ID}}', customer_id)
-                    content = content.replace('{{CUSTOMER_NAME}}', customer_name)
-                    content = content.replace('{{GITHUB_OWNER}}', github['org'])
-                    content = content.replace('{{REPO_NAME}}', github['repo'])
-                    content = content.replace('{{STACK}}', stack.title())
-                    content = content.replace('{{FRAMEWORK}}', info['framework'])
-                    content = content.replace('{{PORT}}', info['port'])
-                    content = content.replace('{{APP_NAME}}', github['repo'])
-                    content = content.replace('{{NAMESPACE}}', f"{customer_id}-dev")  # Default to dev
-                    content = content.replace('{{ENVIRONMENT}}', 'development')
-                    content = content.replace('{{STACK_SETUP}}', stack_instructions.get(stack, ''))
-                    
-                    # Push file to GitHub using GitHub API
-                    file_url = f"https://api.github.com/repos/{github['org']}/{github['repo']}/contents/{target_path}"
-                    
-                    # Check if file exists
-                    check_response = requests.get(file_url, headers={
-                        'Authorization': f"token {github['token']}",
-                        'Accept': 'application/vnd.github.v3+json'
-                    })
-                    
-                    file_data = {
-                        'message': f'Add {target_path} via OpenLuffy',
-                        'content': base64.b64encode(content.encode()).decode(),
-                        'branch': github.get('branch', 'main')
-                    }
-                    
-                    if check_response.status_code == 200:
-                        # File exists, update it
-                        existing_file = check_response.json()
-                        file_data['sha'] = existing_file['sha']
-                    
-                    # Create or update file
-                    push_response = requests.put(file_url, json=file_data, headers={
-                        'Authorization': f"token {github['token']}",
-                        'Accept': 'application/vnd.github.v3+json'
-                    })
-                    
-                    if push_response.ok:
-                        files_pushed.append(target_path)
-                    else:
-                        print(f"Failed to push {target_path}: {push_response.status_code}")
-                
-                result['github']['templates_pushed'] = files_pushed
-                result['github']['message'] = f'Repository initialized with {len(files_pushed)} files'
-            
-        except Exception as e:
-            print(f"Failed to push templates: {e}")
-            result['github']['template_error'] = str(e)
+        template_result = initialize_customer_repo(customer_id, customer_name, stack, github)
+        result['github'].update(template_result)
         
         return result
+        
+    except Exception as e:
+        return JSONResponse(status_code=500, content={'error': str(e)})
+
+@app.post("/customers/{customer_id}/reinitialize")
+async def reinitialize_customer_repo(customer_id: str, request: Request):
+    """
+    Reinitialize a customer's GitHub repository with CI/CD templates
+    
+    Useful for:
+    - Fixing failed initial template push
+    - Updating templates after changes
+    - Re-applying templates to existing repos
+    
+    Expects (optional):
+    {
+        "stack": "nodejs"  // Override stack detection
+    }
+    """
+    try:
+        data = await request.json() if request.headers.get('content-type') == 'application/json' else {}
+        
+        # Get customer integrations
+        github_config = None
+        stack_override = data.get('stack')
+        
+        # Try database first
+        if db_available:
+            try:
+                github_integration = db.query(Integration).filter(
+                    Integration.customer_id == customer_id,
+                    Integration.type == 'github'
+                ).first()
+                
+                if github_integration:
+                    github_config = github_integration.config
+            except Exception as e:
+                print(f"Database query failed: {e}")
+        
+        # Fall back to in-memory store
+        if not github_config and customer_id in integrations_store:
+            github_config = integrations_store[customer_id].get('github')
+        
+        if not github_config:
+            return JSONResponse(status_code=404, content={
+                'error': 'GitHub integration not configured for this customer'
+            })
+        
+        # Detect stack if not overridden
+        stack = stack_override
+        if not stack:
+            repo_name = github_config.get('repo', '')
+            if 'node' in repo_name or 'api' in repo_name or 'express' in repo_name:
+                stack = 'nodejs'
+            elif 'py' in repo_name or 'fastapi' in repo_name or 'django' in repo_name:
+                stack = 'python'
+            elif 'go' in repo_name or 'golang' in repo_name:
+                stack = 'golang'
+            else:
+                stack = 'nodejs'  # Default
+        
+        # Get customer name (try to find it)
+        customer_name = customer_id.replace('-', ' ').title()
+        
+        # Reinitialize repository
+        result = initialize_customer_repo(
+            customer_id=customer_id,
+            customer_name=customer_name,
+            stack=stack,
+            github=github_config
+        )
+        
+        return {
+            'success': len(result['errors']) == 0,
+            'customer_id': customer_id,
+            'stack': stack,
+            **result
+        }
         
     except Exception as e:
         return JSONResponse(status_code=500, content={'error': str(e)})
