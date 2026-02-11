@@ -231,6 +231,68 @@ def get_tools() -> List[Dict[str, Any]]:
                 "properties": {},
                 "required": []
             }
+        },
+        {
+            "name": "create_customer",
+            "description": "Create a new customer in OpenLuffy with GitHub repo and ArgoCD applications. This will create the customer record, GitHub repo (if needed), push CI/CD templates, create K8s namespaces, and set up ArgoCD applications for dev, preprod, and prod environments.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Customer display name (e.g., 'Acme Corp')"
+                    },
+                    "id": {
+                        "type": "string",
+                        "description": "Customer ID slug (e.g., 'acme-corp'). Must be lowercase with hyphens."
+                    },
+                    "stack": {
+                        "type": "string",
+                        "description": "Tech stack: 'nodejs', 'python', or 'golang'",
+                        "enum": ["nodejs", "python", "golang"]
+                    },
+                    "github_org": {
+                        "type": "string",
+                        "description": "GitHub organization or username (e.g., 'lebrick07')"
+                    },
+                    "github_repo": {
+                        "type": "string",
+                        "description": "GitHub repository name (e.g., 'acme-corp-api')"
+                    },
+                    "github_token": {
+                        "type": "string",
+                        "description": "GitHub personal access token with repo permissions"
+                    },
+                    "argocd_url": {
+                        "type": "string",
+                        "description": "ArgoCD URL (e.g., 'http://argocd.local')"
+                    },
+                    "argocd_token": {
+                        "type": "string",
+                        "description": "ArgoCD API token"
+                    }
+                },
+                "required": ["name", "id", "stack", "github_org", "github_repo", "github_token", "argocd_url", "argocd_token"]
+            }
+        },
+        {
+            "name": "delete_customer",
+            "description": "Delete a customer and destroy all their environments. This will delete ArgoCD applications, K8s namespaces, archive the GitHub repo, remove integrations, and delete the customer record. Use with caution!",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "customer_id": {
+                        "type": "string",
+                        "description": "Customer ID to delete (e.g., 'acme-corp')"
+                    },
+                    "delete_repo": {
+                        "type": "boolean",
+                        "description": "If true, permanently delete the GitHub repo. If false (default), archive it instead.",
+                        "default": False
+                    }
+                },
+                "required": ["customer_id"]
+            }
         }
     ]
 
@@ -302,6 +364,15 @@ async def execute_tool(tool_name: str, tool_input: Dict[str, Any]) -> Dict[str, 
     
     elif tool_name == "get_platform_health":
         return await get_platform_health()
+    
+    elif tool_name == "create_customer":
+        return await create_customer(tool_input)
+    
+    elif tool_name == "delete_customer":
+        return await delete_customer(
+            tool_input["customer_id"],
+            tool_input.get("delete_repo", False)
+        )
     
     else:
         return {"error": f"Unknown tool: {tool_name}"}
@@ -786,3 +857,102 @@ async def get_platform_health() -> Dict[str, Any]:
     
     except Exception as e:
         return {"error": f"Failed to get platform health: {str(e)}"}
+
+
+async def create_customer(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Create a new customer via backend API"""
+    try:
+        import httpx
+        
+        # Call the backend create customer endpoint
+        payload = {
+            "name": params["name"],
+            "id": params["id"],
+            "stack": params["stack"],
+            "github": {
+                "org": params["github_org"],
+                "repo": params["github_repo"],
+                "token": params["github_token"],
+                "branch": "main"
+            },
+            "argocd": {
+                "url": params["argocd_url"],
+                "token": params["argocd_token"]
+            }
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "http://localhost:8000/customers/create",
+                json=payload,
+                timeout=60.0
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                return {
+                    "success": True,
+                    "message": f"Customer '{params['name']}' created successfully",
+                    "customer_id": params["id"],
+                    "details": result
+                }
+            else:
+                error_data = response.json()
+                return {
+                    "success": False,
+                    "error": error_data.get("error", "Unknown error")
+                }
+    
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Failed to create customer: {str(e)}"
+        }
+
+
+async def delete_customer(customer_id: str, delete_repo: bool = False) -> Dict[str, Any]:
+    """Delete a customer via backend API"""
+    try:
+        import httpx
+        
+        # Call the backend delete customer endpoint
+        params = {
+            "confirm": customer_id,
+            "delete_repo": "true" if delete_repo else "false"
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.delete(
+                f"http://localhost:8000/customers/{customer_id}",
+                params=params,
+                timeout=60.0
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                
+                if result.get("success"):
+                    return {
+                        "success": True,
+                        "message": f"Customer '{customer_id}' deleted successfully",
+                        "deleted": result.get("deleted", {}),
+                        "errors": result.get("errors", [])
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": "Deletion completed with errors",
+                        "errors": result.get("errors", [])
+                    }
+            else:
+                error_data = response.json()
+                return {
+                    "success": False,
+                    "error": error_data.get("error", "Unknown error")
+                }
+    
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Failed to delete customer: {str(e)}"
+        }
