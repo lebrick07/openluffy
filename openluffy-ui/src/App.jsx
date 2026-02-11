@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import './App.css'
-import { CustomerProvider } from './contexts/CustomerContext'
+import { CustomerProvider, useCustomer } from './contexts/CustomerContext'
 import TopNavbar from './components/TopNavbar'
 import Sidebar from './components/Sidebar'
 import ApplicationsTable from './components/ApplicationsTable'
@@ -12,7 +12,8 @@ import PipelineConfig from './components/PipelineConfig'
 import CreateCustomerWizard from './components/CreateCustomerWizard'
 import AIChatPanel from './components/AIChatPanel'
 
-function App() {
+function AppContent() {
+  const { refreshCustomers } = useCustomer()
   const [activeView, setActiveView] = useState('applications')
   const [selectedEnvironment, setSelectedEnvironment] = useState('all')
   const [showCreateModal, setShowCreateModal] = useState(null) // null | 'customer' | 'application' | 'pipeline' | 'integration'
@@ -27,6 +28,8 @@ function App() {
 
   const handleCreated = () => {
     setShowCreateModal(null)
+    // Refresh customer list after creation
+    refreshCustomers()
   }
 
   const toggleSidebar = () => {
@@ -116,7 +119,6 @@ function App() {
   }
 
   return (
-    <CustomerProvider>
       <div 
         className="app operator-grade" 
         onMouseMove={handleMouseMove}
@@ -228,6 +230,13 @@ function App() {
           </div>
         )}
       </div>
+  )
+}
+
+function App() {
+  return (
+    <CustomerProvider>
+      <AppContent />
     </CustomerProvider>
   )
 }
