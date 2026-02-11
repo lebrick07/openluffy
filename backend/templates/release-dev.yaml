@@ -50,19 +50,19 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Update dev manifest
+      - name: Update dev Helm values
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           echo "Updating dev environment with tag: dev-${SHORT_SHA}"
           
-          # Update k8s deployment manifest
-          sed -i "s|image: ghcr.io/.*|image: ghcr.io/{{GITHUB_OWNER}}/{{REPO_NAME}}:dev-${SHORT_SHA}|g" k8s/deployment.yaml
+          # Update Helm values for dev environment
+          sed -i "s|tag:.*|tag: dev-${SHORT_SHA}|g" helm/app/values/dev.yaml
           
-      - name: Commit dev manifest changes
+      - name: Commit dev values changes
         run: |
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'actions@github.com'
-          git add k8s/deployment.yaml
+          git add helm/app/values/dev.yaml
           
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           git commit -m "chore(dev): update image tag to dev-${SHORT_SHA} [skip ci]" || echo "No changes"
