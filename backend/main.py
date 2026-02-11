@@ -109,7 +109,7 @@ class LuffyActionRequest(BaseModel):
     action: str
     context: Optional[Dict[str, Any]] = None
 
-@app.post("/api/luffy/chat")
+@app.post("/luffy/chat")
 async def luffy_chat(request: LuffyChatRequest):
     """
     Luffy AI Chat - Intelligent Conversational AI DevOps Engineer
@@ -165,7 +165,7 @@ async def luffy_chat(request: LuffyChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/luffy/action")
+@app.post("/luffy/action")
 def luffy_action(request: LuffyActionRequest):
     """
     Execute Luffy AI actions
@@ -1117,7 +1117,7 @@ class CustomerCreate(BaseModel):
     approvalStrategy: str
     observability: List[str]
 
-@app.post("/api/customers/create")
+@app.post("/customers/create")
 async def create_customer(customer_data: CustomerCreate):
     """
     AI-powered customer creation
