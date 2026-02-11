@@ -86,7 +86,8 @@ class LuffyAgent:
     async def _process_response(
         self,
         response: Any,
-        messages: List[Dict[str, str]]
+        messages: List[Dict[str, str]],
+        max_iterations: int = 5
     ) -> Dict[str, Any]:
         """
         Process Claude's response and execute any tool calls
@@ -94,18 +95,24 @@ class LuffyAgent:
         Args:
             response: Claude API response
             messages: Message history
+            max_iterations: Maximum rounds of tool calls to prevent infinite loops
         
         Returns:
             Formatted response for frontend
         """
-        # Check if Claude wants to use tools
-        if response.stop_reason == "tool_use":
+        iteration = 0
+        current_response = response
+        
+        # Keep processing until we get a final text response or hit max iterations
+        while current_response.stop_reason == "tool_use" and iteration < max_iterations:
+            iteration += 1
+            
             # Execute all tool calls
             tool_results = []
-            assistant_message = {"role": "assistant", "content": response.content}
+            assistant_message = {"role": "assistant", "content": current_response.content}
             messages.append(assistant_message)
             
-            for content_block in response.content:
+            for content_block in current_response.content:
                 if content_block.type == "tool_use":
                     tool_name = content_block.name
                     tool_input = content_block.input
@@ -125,20 +132,17 @@ class LuffyAgent:
                 "content": tool_results
             })
             
-            # Get Claude's final response
-            final_response = await self.client.messages.create(
+            # Get next response (might use more tools or return final answer)
+            current_response = await self.client.messages.create(
                 model=self.model,
                 max_tokens=4096,
                 system=self.system_prompt,
                 messages=messages,
                 tools=self.tools
             )
-            
-            return self._format_response(final_response)
         
-        else:
-            # No tool use, return response directly
-            return self._format_response(response)
+        # Format and return the final response
+        return self._format_response(current_response)
     
     def _format_response(self, response: Any) -> Dict[str, Any]:
         """
