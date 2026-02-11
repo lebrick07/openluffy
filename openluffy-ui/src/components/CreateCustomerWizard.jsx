@@ -306,6 +306,23 @@ function CreateCustomerWizard({ onClose, onSuccess }) {
               <h3>ArgoCD Integration</h3>
               <p className="step-description">Configure GitOps deployment automation</p>
               
+              <div className="integration-instructions">
+                <h4>How to Generate an ArgoCD Token</h4>
+                <ol>
+                  <li>Open ArgoCD UI: <a href={argoCDUrl} target="_blank" rel="noopener noreferrer">{argoCDUrl}</a></li>
+                  <li>Log in with your admin credentials</li>
+                  <li>Click on "User Info" (top right) → "Update Password" if needed</li>
+                  <li>Or use CLI: <code>argocd login {argoCDUrl.replace('http://', '')}</code></li>
+                  <li>Generate token: <code>argocd account generate-token</code></li>
+                  <li>Copy the token and paste it below</li>
+                </ol>
+                <div className="help-note">
+                  <strong>💡 Tip:</strong> For the default installation, username is <code>admin</code> 
+                  and password can be retrieved with:<br/>
+                  <code>kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="&#123;.data.password&#125;" | base64 -d</code>
+                </div>
+              </div>
+              
               <div className="form-group">
                 <label>ArgoCD URL *</label>
                 <input

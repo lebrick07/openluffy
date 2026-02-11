@@ -409,3 +409,45 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Help Note Box */
+.help-note {
+  margin-top: 16px;
+  padding: 12px;
+  background: #1e293b;
+  border-left: 3px solid #3b82f6;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.help-note strong {
+  color: #3b82f6;
+}
+
+.help-note code {
+  background: #0f172a;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  color: #6ee7b7;
+}
+
+.integration-instructions ol li code {
+  background: #0f172a;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  color: #6ee7b7;
+}
+
+.integration-instructions a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+
+.integration-instructions a:hover {
+  text-decoration: underline;
+}
