@@ -5,6 +5,7 @@ Tool definitions for Luffy AI agent
 from typing import List, Dict, Any
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
+from datetime import datetime
 import os
 
 # Initialize K8s client
@@ -15,6 +16,7 @@ except:
 
 v1 = client.CoreV1Api()
 apps_v1 = client.AppsV1Api()
+networking_v1 = client.NetworkingV1Api()
 
 
 def get_tools() -> List[Dict[str, Any]]:
@@ -116,6 +118,87 @@ def get_tools() -> List[Dict[str, Any]]:
                 },
                 "required": ["namespace"]
             }
+        },
+        {
+            "name": "list_ingresses",
+            "description": "List all Kubernetes Ingresses across all namespaces or in a specific namespace. Shows hosts, paths, and backend services.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "namespace": {
+                        "type": "string",
+                        "description": "Optional: specific namespace to query. If not provided, lists ingresses from all namespaces."
+                    }
+                },
+                "required": []
+            }
+        },
+        {
+            "name": "restart_deployment",
+            "description": "Restart a Kubernetes deployment by triggering a rollout. Useful when pods need to be restarted to pick up config changes or clear issues.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "namespace": {
+                        "type": "string",
+                        "description": "Kubernetes namespace"
+                    },
+                    "deployment_name": {
+                        "type": "string",
+                        "description": "Name of the deployment to restart"
+                    }
+                },
+                "required": ["namespace", "deployment_name"]
+            }
+        },
+        {
+            "name": "scale_deployment",
+            "description": "Scale a Kubernetes deployment to a specified number of replicas. Use to scale up/down based on load or troubleshoot by scaling to 0 and back.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "namespace": {
+                        "type": "string",
+                        "description": "Kubernetes namespace"
+                    },
+                    "deployment_name": {
+                        "type": "string",
+                        "description": "Name of the deployment to scale"
+                    },
+                    "replicas": {
+                        "type": "integer",
+                        "description": "Target number of replicas (0 to stop, >0 to run)"
+                    }
+                },
+                "required": ["namespace", "deployment_name", "replicas"]
+            }
+        },
+        {
+            "name": "delete_pod",
+            "description": "Delete a specific pod. The deployment controller will automatically recreate it. Useful for forcing a pod restart or clearing stuck pods.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "namespace": {
+                        "type": "string",
+                        "description": "Kubernetes namespace"
+                    },
+                    "pod_name": {
+                        "type": "string",
+                        "description": "Name of the pod to delete"
+                    }
+                },
+                "required": ["namespace", "pod_name"]
+            }
+        },
+        {
+            "name": "list_namespaces",
+            "description": "List all Kubernetes namespaces in the cluster. Shows namespace status, age, and labels.",
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
         }
     ]
 
@@ -151,6 +234,33 @@ async def execute_tool(tool_name: str, tool_input: Dict[str, Any]) -> Dict[str, 
             tool_input["namespace"],
             tool_input.get("limit", 10)
         )
+    
+    elif tool_name == "list_ingresses":
+        return await list_ingresses(
+            tool_input.get("namespace")
+        )
+    
+    elif tool_name == "restart_deployment":
+        return await restart_deployment(
+            tool_input["namespace"],
+            tool_input["deployment_name"]
+        )
+    
+    elif tool_name == "scale_deployment":
+        return await scale_deployment(
+            tool_input["namespace"],
+            tool_input["deployment_name"],
+            tool_input["replicas"]
+        )
+    
+    elif tool_name == "delete_pod":
+        return await delete_pod(
+            tool_input["namespace"],
+            tool_input["pod_name"]
+        )
+    
+    elif tool_name == "list_namespaces":
+        return await list_namespaces()
     
     else:
         return {"error": f"Unknown tool: {tool_name}"}
@@ -289,3 +399,157 @@ async def list_recent_events(namespace: str, limit: int = 10) -> Dict[str, Any]:
     
     except ApiException as e:
         return {"error": f"Failed to get events: {e.reason}"}
+
+
+async def list_ingresses(namespace: str = None) -> Dict[str, Any]:
+    """List ingresses across all namespaces or in a specific namespace"""
+    try:
+        if namespace:
+            ingresses = networking_v1.list_namespaced_ingress(namespace)
+        else:
+            ingresses = networking_v1.list_ingress_for_all_namespaces()
+        
+        ingress_list = []
+        for ing in ingresses.items:
+            ingress_info = {
+                "name": ing.metadata.name,
+                "namespace": ing.metadata.namespace,
+                "class": ing.spec.ingress_class_name,
+                "rules": []
+            }
+            
+            # Parse rules
+            if ing.spec.rules:
+                for rule in ing.spec.rules:
+                    rule_info = {
+                        "host": rule.host or "*",
+                        "paths": []
+                    }
+                    
+                    if rule.http and rule.http.paths:
+                        for path in rule.http.paths:
+                            path_info = {
+                                "path": path.path,
+                                "path_type": path.path_type,
+                                "backend_service": path.backend.service.name if path.backend.service else None,
+                                "backend_port": path.backend.service.port.number if path.backend.service and path.backend.service.port else None
+                            }
+                            rule_info["paths"].append(path_info)
+                    
+                    ingress_info["rules"].append(rule_info)
+            
+            # Get load balancer IPs if any
+            if ing.status.load_balancer and ing.status.load_balancer.ingress:
+                ingress_info["addresses"] = [
+                    lb.ip or lb.hostname
+                    for lb in ing.status.load_balancer.ingress
+                ]
+            
+            ingress_list.append(ingress_info)
+        
+        return {
+            "scope": f"namespace: {namespace}" if namespace else "all namespaces",
+            "count": len(ingress_list),
+            "ingresses": ingress_list
+        }
+    
+    except ApiException as e:
+        return {"error": f"Failed to list ingresses: {e.reason}"}
+
+
+async def restart_deployment(namespace: str, deployment_name: str) -> Dict[str, Any]:
+    """Restart a deployment by adding a timestamp annotation"""
+    try:
+        # Patch deployment with restart annotation
+        now = datetime.now().isoformat()
+        body = {
+            "spec": {
+                "template": {
+                    "metadata": {
+                        "annotations": {
+                            "kubectl.kubernetes.io/restartedAt": now
+                        }
+                    }
+                }
+            }
+        }
+        
+        apps_v1.patch_namespaced_deployment(
+            name=deployment_name,
+            namespace=namespace,
+            body=body
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Deployment {deployment_name} in {namespace} restarted",
+            "timestamp": now
+        }
+    
+    except ApiException as e:
+        return {"error": f"Failed to restart deployment: {e.reason}"}
+
+
+async def scale_deployment(namespace: str, deployment_name: str, replicas: int) -> Dict[str, Any]:
+    """Scale a deployment to specified number of replicas"""
+    try:
+        # Patch deployment replicas
+        body = {
+            "spec": {
+                "replicas": replicas
+            }
+        }
+        
+        apps_v1.patch_namespaced_deployment_scale(
+            name=deployment_name,
+            namespace=namespace,
+            body=body
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Deployment {deployment_name} in {namespace} scaled to {replicas} replicas"
+        }
+    
+    except ApiException as e:
+        return {"error": f"Failed to scale deployment: {e.reason}"}
+
+
+async def delete_pod(namespace: str, pod_name: str) -> Dict[str, Any]:
+    """Delete a pod (useful for forcing restart)"""
+    try:
+        v1.delete_namespaced_pod(
+            name=pod_name,
+            namespace=namespace
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Pod {pod_name} in {namespace} deleted (will be recreated by controller)"
+        }
+    
+    except ApiException as e:
+        return {"error": f"Failed to delete pod: {e.reason}"}
+
+
+async def list_namespaces() -> Dict[str, Any]:
+    """List all namespaces in the cluster"""
+    try:
+        namespaces = v1.list_namespace()
+        
+        ns_list = []
+        for ns in namespaces.items:
+            ns_list.append({
+                "name": ns.metadata.name,
+                "status": ns.status.phase,
+                "age": str(ns.metadata.creation_timestamp),
+                "labels": ns.metadata.labels or {}
+            })
+        
+        return {
+            "count": len(ns_list),
+            "namespaces": ns_list
+        }
+    
+    except ApiException as e:
+        return {"error": f"Failed to list namespaces: {e.reason}"}
