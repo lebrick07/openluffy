@@ -8,6 +8,7 @@ import os
 import httpx
 from datetime import datetime
 from triage import triage_engine
+from luffy_agent import get_agent
 
 app = FastAPI(title="openluffy")
 
@@ -108,137 +109,63 @@ class LuffyActionRequest(BaseModel):
     action: str
     context: Optional[Dict[str, Any]] = None
 
-@app.post("/api/luffy/chat")
-def luffy_chat(request: LuffyChatRequest):
+@app.post("/luffy/chat")
+async def luffy_chat(request: LuffyChatRequest):
     """
-    Luffy AI Chat - Conversational AI DevOps Engineer
+    Luffy AI Chat - Intelligent Conversational AI DevOps Engineer
     
-    Handles natural language requests for:
-    - Troubleshooting ("Why is this pod crashing?")
-    - Error analysis ("Is this an app bug or infra issue?")
-    - Deployments ("Deploy to production")
-    - Rollbacks ("Rollback acme-corp to previous version")
-    - Recommendations ("How can I optimize costs?")
+    Uses Claude to provide:
+    - Intelligent troubleshooting with real K8s data
+    - Error analysis using AI triage engine
+    - Deployments with safety checks
+    - Rollbacks with version history
+    - Proactive recommendations
     """
     try:
-        # Parse intent and route to appropriate handler
-        message_lower = request.message.lower()
+        # Get the Luffy agent instance
+        agent = get_agent()
         
-        # Error analysis intent
-        if any(word in message_lower for word in ['error', 'failing', 'crashed', 'bug', 'issue', 'problem']):
-            # Check if there's an error log in the message or need to fetch
-            if len(request.message) > 100:  # Likely contains log snippet
-                result = triage_engine.analyze(request.message, request.context)
-                return {
-                    "content": f"**{result.category.value.replace('_', ' ').title()}** ({result.confidence:.0%} confidence)\n\n" +
-                               result.reasoning + "\n\n" +
-                               "**Suggested Actions:**\n" +
-                               "\n".join([f"• {action}" for action in result.suggested_actions[:3]]),
-                    "actions": [
-                        {"label": "Show Full Analysis", "action": "show_triage_details"},
-                        {"label": "View Logs", "action": "view_logs"}
-                    ]
-                }
-            else:
-                return {
-                    "content": "I can help analyze errors! Please either:\n\n" +
-                               "• Paste the error log or stack trace\n" +
-                               "• Tell me which pod/deployment is failing\n\n" +
-                               "I'll determine if it's an application bug or infrastructure issue.",
-                    "actions": [
-                        {"label": "View Recent Errors", "action": "view_errors"}
-                    ]
-                }
+        # Extract context
+        customer = request.context.get('customer') if request.context else None
+        environment = request.context.get('environment') if request.context else None
+        model = request.context.get('model') if request.context else None
         
-        # Deployment intent
-        elif any(word in message_lower for word in ['deploy', 'promote', 'release']):
-            customer = request.context.get('customer') if request.context else None
-            if customer:
-                return {
-                    "content": f"Ready to deploy **{customer}** to production.\n\n" +
-                               "**Pre-deployment checks:**\n" +
-                               "• ✓ All tests passing\n" +
-                               "• ✓ Preprod running stable\n" +
-                               "• ⚠️ Manual approval required\n\n" +
-                               "Confirm to proceed?",
-                    "actions": [
-                        {"label": "Deploy to Production", "action": "deploy_prod"},
-                        {"label": "Cancel", "action": "cancel"}
-                    ]
-                }
-            else:
-                return {
-                    "content": "Which customer would you like to deploy? Please select a customer first.",
-                    "actions": []
-                }
+        # Convert history to list of dicts
+        history = [{"role": msg.role, "content": msg.content} for msg in request.history]
         
-        # Rollback intent
-        elif any(word in message_lower for word in ['rollback', 'revert', 'undo']):
-            customer = request.context.get('customer') if request.context else None
-            if customer:
-                return {
-                    "content": f"Preparing rollback for **{customer}**.\n\n" +
-                               "**Previous versions:**\n" +
-                               "• v1.2.3 (2h ago) - Stable\n" +
-                               "• v1.2.2 (1d ago) - Stable\n\n" +
-                               "Which version should I rollback to?",
-                    "actions": [
-                        {"label": "Rollback to v1.2.3", "action": "rollback_v1.2.3"},
-                        {"label": "Rollback to v1.2.2", "action": "rollback_v1.2.2"}
-                    ]
-                }
-            else:
-                return {
-                    "content": "Which customer needs a rollback? Please select a customer first.",
-                    "actions": []
-                }
+        # Call agent
+        response = await agent.chat(
+            message=request.message,
+            customer=customer,
+            environment=environment,
+            history=history,
+            model=model
+        )
         
-        # Status/health check intent
-        elif any(word in message_lower for word in ['status', 'health', 'running', 'up', 'down']):
-            customer = request.context.get('customer') if request.context else None
-            if customer:
-                # Fetch K8s status for customer
-                return {
-                    "content": f"**{customer.upper()} Status:**\n\n" +
-                               "• Dev: ✓ Running (1/1 pods)\n" +
-                               "• Preprod: ✓ Running (1/1 pods)\n" +
-                               "• Prod: ✓ Running (1/1 pods)\n\n" +
-                               "All environments healthy.",
-                    "actions": [
-                        {"label": "View Logs", "action": "view_logs"},
-                        {"label": "View Metrics", "action": "view_metrics"}
-                    ]
-                }
-            else:
-                return {
-                    "content": "All customers:\n\n" +
-                               "• Acme Corp: ✓ Healthy\n" +
-                               "• TechStart: ✓ Healthy\n" +
-                               "• WidgetCo: ✓ Healthy\n\n" +
-                               "Select a customer for detailed status.",
-                    "actions": []
-                }
-        
-        # Default/fallback
-        else:
-            return {
-                "content": "I'm Luffy, your AI DevOps Engineer. I can help with:\n\n" +
-                           "• 🔍 **Error Analysis** - \"Is this an app bug or infra issue?\"\n" +
-                           "• 🚀 **Deployments** - \"Deploy acme-corp to production\"\n" +
-                           "• ⏪ **Rollbacks** - \"Rollback to previous version\"\n" +
-                           "• 📊 **Status Checks** - \"What's the health of my deployments?\"\n" +
-                           "• 💡 **Recommendations** - \"How can I optimize costs?\"\n\n" +
-                           "What would you like me to do?",
-                "actions": [
-                    {"label": "Check Status", "action": "check_status"},
-                    {"label": "View Errors", "action": "view_errors"}
-                ]
+        # Return formatted response
+        return {
+            "content": response["response"],
+            "actions": response.get("actions", []),
+            "model": response.get("model"),
+            "metadata": {
+                "stop_reason": response.get("stop_reason"),
+                "customer": customer,
+                "environment": environment
             }
+        }
         
+    except ValueError as e:
+        # API key not configured
+        return {
+            "content": "⚠️ **Configuration Error**\n\n" +
+                       "Claude API key not configured. Please set ANTHROPIC_API_KEY environment variable.\n\n" +
+                       f"Error: {str(e)}",
+            "actions": []
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/luffy/action")
+@app.post("/luffy/action")
 def luffy_action(request: LuffyActionRequest):
     """
     Execute Luffy AI actions
@@ -1190,7 +1117,7 @@ class CustomerCreate(BaseModel):
     approvalStrategy: str
     observability: List[str]
 
-@app.post("/api/customers/create")
+@app.post("/customers/create")
 async def create_customer(customer_data: CustomerCreate):
     """
     AI-powered customer creation
@@ -1230,7 +1157,6 @@ async def create_customer(customer_data: CustomerCreate):
     }
 
 # ==================== LUFFY AI AGENT ====================
-from luffy_agent import luffy
 
 class LuffyChatRequest(BaseModel):
     message: str

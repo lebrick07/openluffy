@@ -1,212 +1,207 @@
 """
-Luffy - AI Super DevOps Engineer
-OpenClaw Integration Module
+Luffy AI Agent - Core intelligence
 """
 
 import os
-import httpx
-from typing import Dict, List, Optional, Any
-from datetime import datetime
+from typing import List, Dict, Any, Optional
+from anthropic import Anthropic, AsyncAnthropic
+from prompts import get_system_prompt
+from tools import get_tools, execute_tool
 
 
 class LuffyAgent:
     """
-    Luffy is the autonomous AI DevOps Engineer.
-    This class handles all AI interactions via OpenClaw.
+    Captain Luffy - AI Super DevOps Engineer
+    
+    Uses Claude to provide intelligent troubleshooting, analysis,
+    and execution of DevOps operations.
     """
     
-    def __init__(self):
-        self.openclaw_url = os.getenv('OPENCLAW_URL', 'http://localhost:8080')
-        self.openclaw_token = os.getenv('OPENCLAW_TOKEN', '')
-        self.session_id = os.getenv('OPENCLAW_SESSION', 'main')
+    def __init__(self, api_key: Optional[str] = None):
+        """
+        Initialize Luffy agent
         
+        Args:
+            api_key: Anthropic API key (falls back to ANTHROPIC_API_KEY env var)
+        """
+        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
+        if not self.api_key:
+            raise ValueError("ANTHROPIC_API_KEY not provided")
+        
+        self.client = AsyncAnthropic(api_key=self.api_key)
+        self.system_prompt = get_system_prompt()
+        self.tools = get_tools()
+        self.model = "claude-sonnet-4-20250514"  # Default model
+    
     async def chat(
-        self, 
-        message: str, 
-        context: Optional[Dict[str, Any]] = None,
-        history: Optional[List[Dict[str, str]]] = None
+        self,
+        message: str,
+        customer: Optional[str] = None,
+        environment: Optional[str] = None,
+        history: Optional[List[Dict[str, str]]] = None,
+        model: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Send a message to Luffy and get a response.
+        Process a chat message and return response
         
         Args:
             message: User's message
-            context: Current context (customer, environment, resource)
-            history: Previous messages in conversation
-            
+            customer: Active customer (optional)
+            environment: Active environment (optional)
+            history: Conversation history (optional)
+            model: Claude model to use (optional, defaults to Sonnet 4)
+        
         Returns:
-            Dict with 'content' and optional 'actions' list
+            Dict with response, actions, and metadata
         """
+        # Build context from customer/environment
+        context_message = ""
+        if customer:
+            context_message = f"\n\nCurrent context: Customer={customer}"
+            if environment:
+                context_message += f", Environment={environment}"
         
-        # Build context-aware prompt
-        system_context = self._build_context_prompt(context)
-        full_message = f"{system_context}\n\n{message}"
+        # Build messages list
+        messages = history or []
+        messages.append({
+            "role": "user",
+            "content": message + context_message
+        })
         
-        try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    f"{self.openclaw_url}/api/chat",
-                    json={
-                        "message": full_message,
-                        "session": self.session_id,
-                        "history": history or []
-                    },
-                    headers={
-                        "Authorization": f"Bearer {self.openclaw_token}"
-                    } if self.openclaw_token else {}
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    
-                    # Parse actions from response
-                    actions = self._extract_actions(data.get('content', ''))
-                    
-                    return {
-                        "content": data.get('content', 'No response from Luffy'),
-                        "actions": actions,
-                        "timestamp": datetime.utcnow().isoformat()
-                    }
-                else:
-                    return {
-                        "content": f"Error: Luffy is unavailable (status {response.status_code})",
-                        "actions": [],
-                        "timestamp": datetime.utcnow().isoformat()
-                    }
-                    
-        except Exception as e:
-            return {
-                "content": f"Error connecting to Luffy: {str(e)}",
-                "actions": [],
-                "timestamp": datetime.utcnow().isoformat()
-            }
+        # Use provided model or default
+        model_to_use = model or self.model
+        
+        # Call Claude with tools
+        response = await self.client.messages.create(
+            model=model_to_use,
+            max_tokens=4096,
+            system=self.system_prompt,
+            messages=messages,
+            tools=self.tools
+        )
+        
+        # Process response and tool calls
+        return await self._process_response(response, messages)
     
-    def _build_context_prompt(self, context: Optional[Dict[str, Any]]) -> str:
-        """Build context-aware system prompt"""
-        if not context:
-            return "You are Luffy, an AI Super DevOps Engineer."
-        
-        parts = ["You are Luffy, an AI Super DevOps Engineer. Current context:"]
-        
-        if context.get('customer'):
-            parts.append(f"- Customer: {context['customer']}")
-        if context.get('environment'):
-            parts.append(f"- Environment: {context['environment']}")
-        if context.get('resource_type'):
-            parts.append(f"- Resource: {context['resource_type']} ({context.get('resource_name', 'unknown')})")
-        
-        parts.append("\nYour job is to help manage this infrastructure autonomously.")
-        parts.append("Propose fixes, generate configurations, and explain your reasoning.")
-        
-        return "\n".join(parts)
-    
-    def _extract_actions(self, content: str) -> List[Dict[str, str]]:
-        """
-        Extract actionable items from AI response.
-        Look for keywords that suggest actions.
-        """
-        actions = []
-        
-        # Simple keyword matching (can be improved with better parsing)
-        if "fix" in content.lower() or "patch" in content.lower():
-            actions.append({"label": "Apply Fix", "action": "apply-fix"})
-        
-        if "rollback" in content.lower():
-            actions.append({"label": "Rollback", "action": "rollback"})
-        
-        if "log" in content.lower() or "logs" in content.lower():
-            actions.append({"label": "Show Logs", "action": "show-logs"})
-        
-        if "deploy" in content.lower():
-            actions.append({"label": "Deploy", "action": "deploy"})
-        
-        if "config" in content.lower() or "manifest" in content.lower():
-            actions.append({"label": "View Config", "action": "view-config"})
-        
-        return actions
-    
-    async def execute_action(
-        self, 
-        action: str, 
-        context: Optional[Dict[str, Any]] = None
+    async def _process_response(
+        self,
+        response: Any,
+        messages: List[Dict[str, str]]
     ) -> Dict[str, Any]:
         """
-        Execute an action proposed by Luffy.
+        Process Claude's response and execute any tool calls
         
         Args:
-            action: Action identifier (apply-fix, rollback, etc.)
-            context: Current context
-            
+            response: Claude API response
+            messages: Message history
+        
         Returns:
-            Result of the action
+            Formatted response for frontend
         """
+        # Check if Claude wants to use tools
+        if response.stop_reason == "tool_use":
+            # Execute all tool calls
+            tool_results = []
+            assistant_message = {"role": "assistant", "content": response.content}
+            messages.append(assistant_message)
+            
+            for content_block in response.content:
+                if content_block.type == "tool_use":
+                    tool_name = content_block.name
+                    tool_input = content_block.input
+                    
+                    # Execute tool
+                    result = await execute_tool(tool_name, tool_input)
+                    
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": content_block.id,
+                        "content": str(result)
+                    })
+            
+            # Send tool results back to Claude
+            messages.append({
+                "role": "user",
+                "content": tool_results
+            })
+            
+            # Get Claude's final response
+            final_response = await self.client.messages.create(
+                model=self.model,
+                max_tokens=4096,
+                system=self.system_prompt,
+                messages=messages,
+                tools=self.tools
+            )
+            
+            return self._format_response(final_response)
         
-        # Action handlers
-        handlers = {
-            "apply-fix": self._apply_fix,
-            "rollback": self._rollback,
-            "show-logs": self._show_logs,
-            "deploy": self._deploy,
-            "view-config": self._view_config
-        }
+        else:
+            # No tool use, return response directly
+            return self._format_response(response)
+    
+    def _format_response(self, response: Any) -> Dict[str, Any]:
+        """
+        Format Claude's response for the frontend
         
-        handler = handlers.get(action)
-        if not handler:
-            return {
-                "success": False,
-                "message": f"Unknown action: {action}"
-            }
+        Args:
+            response: Claude API response
         
-        try:
-            return await handler(context)
-        except Exception as e:
-            return {
-                "success": False,
-                "message": f"Action failed: {str(e)}"
-            }
-    
-    async def _apply_fix(self, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """Apply a fix to the system"""
-        # TODO: Implement actual fix application
+        Returns:
+            Formatted response dict
+        """
+        # Extract text content
+        text_content = ""
+        actions = []
+        
+        for content_block in response.content:
+            if content_block.type == "text":
+                text_content += content_block.text
+        
+        # TODO: Parse action buttons from response text
+        # For now, return basic structure
+        
         return {
-            "success": True,
-            "message": "Fix applied successfully (placeholder)"
+            "response": text_content,
+            "actions": actions,
+            "model": self.model,
+            "stop_reason": response.stop_reason
         }
     
-    async def _rollback(self, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """Rollback a deployment"""
-        # TODO: Implement actual rollback
+    async def execute_action(
+        self,
+        action_type: str,
+        action_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Execute a confirmed action (restart, scale, etc.)
+        
+        Args:
+            action_type: Type of action (restart, scale, rollback, etc.)
+            action_data: Action parameters
+        
+        Returns:
+            Result of action execution
+        """
+        # TODO: Implement action execution
+        # For now, return placeholder
         return {
-            "success": True,
-            "message": "Rollback initiated (placeholder)"
-        }
-    
-    async def _show_logs(self, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """Fetch and return logs"""
-        # TODO: Implement actual log fetching
-        return {
-            "success": True,
-            "message": "Logs retrieved (placeholder)",
-            "logs": "Sample log output..."
-        }
-    
-    async def _deploy(self, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """Deploy to environment"""
-        # TODO: Implement actual deployment
-        return {
-            "success": True,
-            "message": "Deployment started (placeholder)"
-        }
-    
-    async def _view_config(self, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """View configuration"""
-        # TODO: Implement actual config retrieval
-        return {
-            "success": True,
-            "message": "Configuration retrieved (placeholder)",
-            "config": "apiVersion: v1\nkind: Service\n..."
+            "success": False,
+            "message": "Action execution not yet implemented",
+            "action_type": action_type,
+            "action_data": action_data
         }
 
 
-# Singleton instance
-luffy = LuffyAgent()
+# Global agent instance
+_agent_instance: Optional[LuffyAgent] = None
+
+
+def get_agent() -> LuffyAgent:
+    """Get or create the global Luffy agent instance"""
+    global _agent_instance
+    
+    if _agent_instance is None:
+        _agent_instance = LuffyAgent()
+    
+    return _agent_instance
