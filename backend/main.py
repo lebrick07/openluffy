@@ -588,6 +588,8 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
     """
     Initialize a customer GitHub repo with CI/CD templates
     
+    Uses git clone + batch commit to avoid triggering multiple workflow runs.
+    
     Args:
         customer_id: Customer ID (e.g., 'acme-corp')
         customer_name: Display name (e.g., 'Acme Corp')
@@ -597,8 +599,9 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
     Returns:
         dict with templates_pushed list and message
     """
-    import requests
-    import base64
+    import subprocess
+    import tempfile
+    import shutil
     from pathlib import Path
     
     result = {'templates_pushed': [], 'message': '', 'errors': []}
@@ -690,68 +693,101 @@ Visit: http://localhost:8080'''
             result['errors'].append(f'Unknown stack: {stack}')
             return result
         
-        for target_path, template_file in stack_templates[stack].items():
-            template_path = templates_dir / template_file
+        # Clone repo to temp directory
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_path = Path(tmpdir) / github['repo']
+            repo_url = f"https://{github['token']}@github.com/{github['org']}/{github['repo']}.git"
+            branch = github.get('branch', 'main')
             
-            if not template_path.exists():
-                result['errors'].append(f'Template not found: {template_file}')
-                continue
-            
-            # Read template content
-            with open(template_path, 'r') as f:
-                content = f.read()
-            
-            # Replace placeholders
-            stack_info = {
-                'nodejs': {'framework': 'Express.js', 'port': '3000'},
-                'python': {'framework': 'FastAPI', 'port': '8000'},
-                'golang': {'framework': 'net/http', 'port': '8080'},
-            }
-            
-            info = stack_info.get(stack, {'framework': 'Unknown', 'port': '8000'})
-            
-            content = content.replace('{{CUSTOMER_ID}}', customer_id)
-            content = content.replace('{{CUSTOMER_NAME}}', customer_name)
-            content = content.replace('{{GITHUB_OWNER}}', github['org'])
-            content = content.replace('{{REPO_NAME}}', github['repo'])
-            content = content.replace('{{STACK}}', stack.title())
-            content = content.replace('{{FRAMEWORK}}', info['framework'])
-            content = content.replace('{{PORT}}', info['port'])
-            content = content.replace('{{APP_NAME}}', github['repo'])
-            content = content.replace('{{NAMESPACE}}', f"{customer_id}-dev")
-            content = content.replace('{{ENVIRONMENT}}', 'development')
-            content = content.replace('{{STACK_SETUP}}', stack_instructions.get(stack, ''))
-            
-            # Push file to GitHub using GitHub API
-            file_url = f"https://api.github.com/repos/{github['org']}/{github['repo']}/contents/{target_path}"
-            
-            # Check if file exists
-            check_response = requests.get(file_url, headers={
-                'Authorization': f"token {github['token']}",
-                'Accept': 'application/vnd.github.v3+json'
-            })
-            
-            file_data = {
-                'message': f'Add {target_path} via OpenLuffy',
-                'content': base64.b64encode(content.encode()).decode(),
-                'branch': github.get('branch', 'main')
-            }
-            
-            if check_response.status_code == 200:
-                # File exists, update it
-                existing_file = check_response.json()
-                file_data['sha'] = existing_file['sha']
-            
-            # Create or update file
-            push_response = requests.put(file_url, json=file_data, headers={
-                'Authorization': f"token {github['token']}",
-                'Accept': 'application/vnd.github.v3+json'
-            })
-            
-            if push_response.ok:
-                result['templates_pushed'].append(target_path)
-            else:
-                result['errors'].append(f'Failed to push {target_path}: {push_response.status_code}')
+            try:
+                # Clone the repository
+                subprocess.run(
+                    ['git', 'clone', '--depth=1', '--branch', branch, repo_url, str(repo_path)],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                
+                # Process and write all template files
+                stack_info = {
+                    'nodejs': {'framework': 'Express.js', 'port': '3000'},
+                    'python': {'framework': 'FastAPI', 'port': '8000'},
+                    'golang': {'framework': 'net/http', 'port': '8080'},
+                }
+                
+                info = stack_info.get(stack, {'framework': 'Unknown', 'port': '8000'})
+                
+                for target_path, template_file in stack_templates[stack].items():
+                    template_path = templates_dir / template_file
+                    
+                    if not template_path.exists():
+                        result['errors'].append(f'Template not found: {template_file}')
+                        continue
+                    
+                    # Read and process template
+                    with open(template_path, 'r') as f:
+                        content = f.read()
+                    
+                    # Replace placeholders
+                    content = content.replace('{{CUSTOMER_ID}}', customer_id)
+                    content = content.replace('{{CUSTOMER_NAME}}', customer_name)
+                    content = content.replace('{{GITHUB_OWNER}}', github['org'])
+                    content = content.replace('{{REPO_NAME}}', github['repo'])
+                    content = content.replace('{{STACK}}', stack.title())
+                    content = content.replace('{{FRAMEWORK}}', info['framework'])
+                    content = content.replace('{{PORT}}', info['port'])
+                    content = content.replace('{{APP_NAME}}', github['repo'])
+                    content = content.replace('{{NAMESPACE}}', f"{customer_id}-dev")
+                    content = content.replace('{{ENVIRONMENT}}', 'development')
+                    content = content.replace('{{STACK_SETUP}}', stack_instructions.get(stack, ''))
+                    
+                    # Write file to repo
+                    file_path = repo_path / target_path
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    with open(file_path, 'w') as f:
+                        f.write(content)
+                    
+                    result['templates_pushed'].append(target_path)
+                
+                # Configure git user
+                subprocess.run(
+                    ['git', 'config', 'user.name', 'OpenLuffy'],
+                    cwd=repo_path,
+                    check=True
+                )
+                subprocess.run(
+                    ['git', 'config', 'user.email', 'openluffy@automation'],
+                    cwd=repo_path,
+                    check=True
+                )
+                
+                # Git add all files
+                subprocess.run(
+                    ['git', 'add', '-A'],
+                    cwd=repo_path,
+                    check=True,
+                    capture_output=True
+                )
+                
+                # Git commit (single commit for all files)
+                subprocess.run(
+                    ['git', 'commit', '-m', f'Initialize {customer_name} repository via OpenLuffy\n\nStack: {stack}\nFiles: {len(result["templates_pushed"])}'],
+                    cwd=repo_path,
+                    check=True,
+                    capture_output=True
+                )
+                
+                # Git push
+                subprocess.run(
+                    ['git', 'push', 'origin', branch],
+                    cwd=repo_path,
+                    check=True,
+                    capture_output=True
+                )
+                
+            except subprocess.CalledProcessError as e:
+                result['errors'].append(f'Git operation failed: {e.stderr}')
         
         result['message'] = f'Repository initialized with {len(result["templates_pushed"])} files'
         
