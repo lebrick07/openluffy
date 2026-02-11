@@ -285,7 +285,7 @@ function IntegrationsDashboard() {
         actions: ['Open UI', 'Sync Apps', 'Configure'],
         url: 'http://argocd.local'
       }
-    } catch (error) {
+    } catch {
       return null
     }
   }
@@ -314,7 +314,7 @@ function IntegrationsDashboard() {
         actions: ['View Repo', 'Workflows', 'Configure'],
         url: repoUrl
       }
-    } catch (error) {
+    } catch {
       return null
     }
   }
@@ -340,7 +340,7 @@ function IntegrationsDashboard() {
         },
         actions: ['View Pods', 'Deployments', 'Configure']
       }
-    } catch (error) {
+    } catch {
       return null
     }
   }
