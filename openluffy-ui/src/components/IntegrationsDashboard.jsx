@@ -55,9 +55,9 @@ const availableIntegrations = [
         name: 'org', 
         label: 'Repository Owner', 
         type: 'text', 
-        placeholder: 'acme-corp',
+        placeholder: 'lebrick07 or https://github.com/lebrick07',
         required: true,
-        helpText: 'GitHub username or organization that owns the repository'
+        helpText: 'GitHub username or organization (URLs will be auto-extracted)'
       },
       { 
         name: 'repo', 
@@ -415,6 +415,18 @@ function IntegrationsDashboard() {
   }
 
   const handleConfigChange = (field, value) => {
+    // Auto-extract username from GitHub URLs for org field
+    if (field === 'org' && selectedToAdd?.id === 'github' && value) {
+      // Match patterns like:
+      // https://github.com/username
+      // http://github.com/username
+      // github.com/username
+      const urlMatch = value.match(/(?:https?:\/\/)?(?:www\.)?github\.com\/([^\/\s]+)/i)
+      if (urlMatch) {
+        value = urlMatch[1]
+      }
+    }
+    
     setConfigData({ ...configData, [field]: value })
   }
 

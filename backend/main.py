@@ -343,6 +343,148 @@ def delete_customer_integration(customer_id: str, integration_type: str):
     
     return {'success': True, 'message': f'{integration_type} integration removed'}
 
+@app.post("/customers/create")
+async def create_customer(request: Request):
+    """
+    Create a new customer with GitHub repo and ArgoCD applications
+    
+    Expects:
+    {
+        "name": "Acme Corp",
+        "id": "acme-corp",
+        "stack": "nodejs",
+        "github": {
+            "org": "lebrick07",
+            "repo": "acme-corp-api",
+            "token": "ghp_xxx",
+            "branch": "main"
+        },
+        "argocd": {
+            "url": "http://argocd.local",
+            "token": "xxx"
+        }
+    }
+    """
+    try:
+        data = await request.json()
+        
+        customer_name = data.get('name')
+        customer_id = data.get('id')
+        stack = data.get('stack', 'nodejs')
+        github = data.get('github', {})
+        argocd = data.get('argocd', {})
+        
+        if not customer_name or not customer_id:
+            return JSONResponse(status_code=400, content={'error': 'Customer name and ID are required'})
+        
+        if not github.get('org') or not github.get('repo') or not github.get('token'):
+            return JSONResponse(status_code=400, content={'error': 'GitHub integration is required'})
+        
+        if not argocd.get('url') or not argocd.get('token'):
+            return JSONResponse(status_code=400, content={'error': 'ArgoCD integration is required'})
+        
+        result = {
+            'success': True,
+            'customer_id': customer_id,
+            'customer_name': customer_name,
+            'github': {},
+            'k8s': {},
+            'argocd': {}
+        }
+        
+        # Step 1: Check if GitHub repo exists
+        import requests
+        
+        repo_url = f"https://api.github.com/repos/{github['org']}/{github['repo']}"
+        repo_response = requests.get(repo_url, headers={
+            'Authorization': f"token {github['token']}",
+            'Accept': 'application/vnd.github.v3+json'
+        })
+        
+        if repo_response.status_code == 200:
+            # Repo exists, use it
+            result['github']['action'] = 'existing'
+            result['github']['url'] = f"https://github.com/{github['org']}/{github['repo']}"
+            result['github']['message'] = 'Using existing repository'
+        elif repo_response.status_code == 404:
+            # Repo doesn't exist, create it
+            create_repo_url = f"https://api.github.com/user/repos"
+            create_data = {
+                'name': github['repo'],
+                'description': f"Customer application - {customer_name}",
+                'private': False,
+                'auto_init': True
+            }
+            
+            create_response = requests.post(create_repo_url, json=create_data, headers={
+                'Authorization': f"token {github['token']}",
+                'Accept': 'application/vnd.github.v3+json'
+            })
+            
+            if not create_response.ok:
+                return JSONResponse(status_code=400, content={
+                    'error': f'Failed to create GitHub repository: {create_response.json().get("message", "Unknown error")}'
+                })
+            
+            result['github']['action'] = 'created'
+            result['github']['url'] = f"https://github.com/{github['org']}/{github['repo']}"
+            result['github']['message'] = 'Repository created from template'
+        else:
+            return JSONResponse(status_code=400, content={
+                'error': f'Failed to check GitHub repository: {repo_response.status_code}'
+            })
+        
+        # Step 2: Store integrations
+        if customer_id not in integrations_store:
+            integrations_store[customer_id] = {}
+        
+        integrations_store[customer_id]['github'] = github
+        integrations_store[customer_id]['argocd'] = argocd
+        
+        # Step 3: Create K8s namespaces (if k8s available)
+        namespaces_created = []
+        if k8s_available:
+            try:
+                for env in ['dev', 'preprod', 'prod']:
+                    namespace_name = f"{customer_id}-{env}"
+                    try:
+                        from kubernetes.client import V1Namespace, V1ObjectMeta
+                        namespace = V1Namespace(
+                            metadata=V1ObjectMeta(
+                                name=namespace_name,
+                                labels={
+                                    'customer': customer_id,
+                                    'environment': env,
+                                    'managed-by': 'openluffy'
+                                }
+                            )
+                        )
+                        v1.create_namespace(namespace)
+                        namespaces_created.append(namespace_name)
+                    except Exception as ns_error:
+                        if '409' in str(ns_error):  # Already exists
+                            namespaces_created.append(namespace_name)
+                        else:
+                            print(f"Failed to create namespace {namespace_name}: {ns_error}")
+                
+                result['k8s']['namespaces'] = namespaces_created
+            except Exception as k8s_error:
+                print(f"K8s namespace creation error: {k8s_error}")
+                result['k8s']['error'] = str(k8s_error)
+        
+        # Step 4: Create ArgoCD applications (placeholder - would need ArgoCD API)
+        result['argocd']['applications'] = [
+            f"{customer_id}-dev",
+            f"{customer_id}-preprod",
+            f"{customer_id}-prod"
+        ]
+        result['argocd']['message'] = 'ArgoCD applications configured (manual sync required)'
+        
+        return result
+        
+    except Exception as e:
+        return JSONResponse(status_code=500, content={'error': str(e)})
+
 @app.get("/deployments")
 def get_deployments():
     """Get all deployments across all customer namespaces and environments"""

@@ -9,7 +9,7 @@ import IntegrationsDashboard from './components/IntegrationsDashboard'
 import K8sInsights from './components/K8sInsights'
 import PipelinesView from './components/PipelinesView'
 import PipelineConfig from './components/PipelineConfig'
-import CreateCustomerModal from './components/CreateCustomerModal'
+import CreateCustomerWizard from './components/CreateCustomerWizard'
 import AIChatPanel from './components/AIChatPanel'
 
 function App() {
@@ -180,9 +180,9 @@ function App() {
 
         {/* Create Modals */}
         {showCreateModal === 'customer' && (
-          <CreateCustomerModal
+          <CreateCustomerWizard
             onClose={() => setShowCreateModal(null)}
-            onCustomerCreated={handleCreated}
+            onSuccess={handleCreated}
           />
         )}
 
