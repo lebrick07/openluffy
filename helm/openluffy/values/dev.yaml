@@ -4,7 +4,7 @@ namespace: openluffy-dev
 backend:
   image:
     repository: ghcr.io/lebrick07/openluffy-backend
-    tag: dev-b09f101 # backend
+    tag: dev-309400b # backend
     pullPolicy: IfNotPresent
   replicas: 1
   service:
@@ -14,7 +14,7 @@ backend:
 frontend:
   image:
     repository: ghcr.io/lebrick07/openluffy-frontend
-    tag: dev-b09f101 # frontend
+    tag: dev-309400b # frontend
     pullPolicy: IfNotPresent
   replicas: 1
   service:
