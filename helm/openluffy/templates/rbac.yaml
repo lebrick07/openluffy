@@ -17,7 +17,7 @@ metadata:
     app: {{ .Release.Name }}
     component: backend
 rules:
-  # Read-only access to pods, deployments, services across all namespaces
+  # Core resources - full operational access
   - apiGroups: [""]
     resources:
       - pods
@@ -26,11 +26,18 @@ rules:
       - nodes
       - persistentvolumeclaims
       - configmaps
+      - secrets
+      - events
     verbs:
       - get
       - list
       - watch
+      - create
+      - update
+      - patch
+      - delete
 
+  # Workload resources - full management
   - apiGroups: ["apps"]
     resources:
       - deployments
@@ -41,32 +48,89 @@ rules:
       - get
       - list
       - watch
+      - create
+      - update
+      - patch
+      - delete
 
-  # Read pod logs
+  # Pod operations - logs, exec, port-forward
   - apiGroups: [""]
     resources:
       - pods/log
+      - pods/exec
+      - pods/portforward
     verbs:
       - get
       - list
+      - create
 
-  # Access to ArgoCD Applications
+  # ArgoCD Applications - full management
   - apiGroups: ["argoproj.io"]
     resources:
       - applications
+      - applicationsets
+      - appprojects
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+
+  # Networking - ingresses, network policies
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+      - networkpolicies
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+
+  # RBAC - view roles and bindings
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources:
+      - roles
+      - rolebindings
+      - clusterroles
+      - clusterrolebindings
     verbs:
       - get
       - list
       - watch
 
-  # Access to Ingresses
-  - apiGroups: ["networking.k8s.io"]
+  # Batch jobs
+  - apiGroups: ["batch"]
     resources:
-      - ingresses
+      - jobs
+      - cronjobs
     verbs:
       - get
       - list
       - watch
+      - create
+      - update
+      - patch
+      - delete
+
+  # Autoscaling
+  - apiGroups: ["autoscaling"]
+    resources:
+      - horizontalpodautoscalers
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
