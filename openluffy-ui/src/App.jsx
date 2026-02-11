@@ -10,6 +10,7 @@ import PipelinesView from './components/PipelinesView'
 import PipelineConfig from './components/PipelineConfig'
 import CreateCustomerWizard from './components/CreateCustomerWizard'
 import AIChatPanel from './components/AIChatPanel'
+import SettingsPage from './components/SettingsPage'
 
 function AppContent() {
   const { refreshCustomers } = useCustomer()
@@ -94,18 +95,7 @@ function AppContent() {
           </div>
         )
       case 'settings':
-        return (
-          <div className="view-container">
-            <div className="view-header">
-              <h1>Settings</h1>
-              <p className="view-subtitle">Configuration and preferences</p>
-            </div>
-            <div className="coming-soon">
-              <p>🚧 Under Construction</p>
-              <p className="coming-soon-detail">Configuration options coming soon...</p>
-            </div>
-          </div>
-        )
+        return <SettingsPage />
       default:
         return (
           <ApplicationsTable 
