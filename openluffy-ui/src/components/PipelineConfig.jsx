@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useCustomer } from '../contexts/CustomerContext'
 import './PipelineConfig.css'
 
@@ -8,22 +8,22 @@ function PipelineConfig() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    if (activeCustomer) {
-      loadCustomerConfig()
-    } else {
-      setConfig(null)
-    }
-  }, [activeCustomer])
-
-  const loadCustomerConfig = async () => {
+  const loadCustomerConfig = useCallback(async () => {
     setLoading(true)
     
     // Load template based on customer stack
     const template = getDefaultConfig(activeCustomer.stack)
     setConfig(template)
     setLoading(false)
-  }
+  }, [activeCustomer])
+
+  useEffect(() => {
+    if (activeCustomer) {
+      loadCustomerConfig()
+    } else {
+      setConfig(null)
+    }
+  }, [activeCustomer, loadCustomerConfig])
 
   const getDefaultConfig = (stack) => {
     const base = {

@@ -1,17 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import './PipelineStatus.css'
 
 function PipelineStatus({ customerId }) {
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchStatus()
-    const interval = setInterval(fetchStatus, 30000) // Refresh every 30s
-    return () => clearInterval(interval)
-  }, [customerId])
-
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     try {
       const response = await fetch('/api/pipelines/status')
       if (!response.ok) throw new Error('Failed to fetch')
@@ -23,7 +17,13 @@ function PipelineStatus({ customerId }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [customerId])
+
+  useEffect(() => {
+    fetchStatus()
+    const interval = setInterval(fetchStatus, 30000) // Refresh every 30s
+    return () => clearInterval(interval)
+  }, [fetchStatus])
 
   if (loading || !status) {
     return (

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import './LogViewer.css'
 
 function LogViewer({ deploymentId, deploymentName, namespace, customer }) {
@@ -16,13 +16,13 @@ function LogViewer({ deploymentId, deploymentName, namespace, customer }) {
 
   useEffect(() => {
     fetchPods()
-  }, [deploymentId])
+  }, [fetchPods])
 
   useEffect(() => {
     if (selectedPod) {
       fetchLogs()
     }
-  }, [selectedPod, lines])
+  }, [selectedPod, lines, fetchLogs])
 
   useEffect(() => {
     if (autoRefresh && selectedPod) {
@@ -33,7 +33,7 @@ function LogViewer({ deploymentId, deploymentName, namespace, customer }) {
         clearInterval(intervalRef.current)
       }
     }
-  }, [autoRefresh, selectedPod])
+  }, [autoRefresh, selectedPod, fetchLogs])
 
   useEffect(() => {
     if (followMode) {
@@ -45,7 +45,7 @@ function LogViewer({ deploymentId, deploymentName, namespace, customer }) {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  const fetchPods = async () => {
+  const fetchPods = useCallback(async () => {
     try {
       const response = await fetch(`/api/deployments/${deploymentId}/details-v2`)
       if (!response.ok) throw new Error('Failed to fetch')
@@ -57,9 +57,9 @@ function LogViewer({ deploymentId, deploymentName, namespace, customer }) {
     } catch (error) {
       console.error('Error fetching pods:', error)
     }
-  }
+  }, [deploymentId])
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     if (!selectedPod) return
     
     setLoading(true)
@@ -107,7 +107,7 @@ function LogViewer({ deploymentId, deploymentName, namespace, customer }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [deploymentId, selectedPod, lines])
 
   const downloadLogs = () => {
     const content = logs.map(log => log.raw).join('\n')

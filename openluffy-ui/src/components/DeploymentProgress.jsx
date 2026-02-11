@@ -59,7 +59,7 @@ function DeploymentProgress({ customerId, onClose }) {
       clearInterval(interval)
       clearTimeout(timeout)
     }
-  }, [customerId])
+  }, [customerId, onClose, status])
 
   const getStatusInfo = () => {
     switch (status) {
