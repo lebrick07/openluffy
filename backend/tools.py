@@ -937,8 +937,8 @@ async def create_customer(params: Dict[str, Any]) -> Dict[str, Any]:
                 result = response.json()
                 return {
                     "success": True,
-                    "message": f"Customer '{params['name']}' created successfully",
-                    "customer_id": params["id"],
+                    "message": f"Customer '{customer_name}' created successfully",
+                    "customer_id": customer_id,
                     "details": result
                 }
             else:
