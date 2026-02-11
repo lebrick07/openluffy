@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useCustomer } from '../contexts/CustomerContext'
 import './IntegrationsDashboard.css'
 
 // Available integrations that can be added
@@ -47,43 +48,54 @@ const availableIntegrations = [
     id: 'github',
     name: 'GitHub',
     icon: '⚙️',
-    description: 'Connect your GitHub organization for automated customer onboarding',
-    helpText: 'Required for "Create Customer" feature. Luffy will create repos, configure CI/CD pipelines, and raise PRs automatically.',
+    description: 'Connect this customer\'s GitHub repository',
+    helpText: 'Configure the GitHub repo where this customer\'s application code lives. Used for CI/CD pipeline integration and automated deployments.',
     configFields: [
       { 
         name: 'org', 
-        label: 'Organization / Username', 
+        label: 'Repository Owner', 
         type: 'text', 
-        placeholder: 'lebrick07',
+        placeholder: 'acme-corp',
         required: true,
-        helpText: 'Your GitHub username or organization name where customer repos will be created'
+        helpText: 'GitHub username or organization that owns the repository'
+      },
+      { 
+        name: 'repo', 
+        label: 'Repository Name', 
+        type: 'text', 
+        placeholder: 'acme-corp-api',
+        required: true,
+        helpText: 'Name of the repository (without owner)'
       },
       { 
         name: 'token', 
         label: 'Personal Access Token', 
         type: 'password', 
         required: true,
-        helpText: 'Token needs: repo, workflow, read:org scopes'
+        helpText: 'GitHub token with repo, workflow, read:org scopes. Used to access this customer\'s repository for CI/CD automation.'
       },
       {
-        name: 'templateRepo',
-        label: 'Template Repository',
+        name: 'branch',
+        label: 'Default Branch',
         type: 'text',
-        placeholder: 'lebrick07/openluffy-templates',
-        required: true,
-        helpText: 'Repository containing customer templates (Node.js, Python, Go)'
+        placeholder: 'main',
+        required: false,
+        helpText: 'Main branch to track (default: main)'
       }
     ],
     instructions: {
       title: 'How to Generate a GitHub Token',
       steps: [
         'Click "Generate Token" below to open GitHub',
-        'Confirm the scopes: repo, workflow, read:org',
-        'Click "Generate token" at the bottom',
-        'Copy the token and paste it above',
-        'Click "Test Connection" to verify'
+        'Confirm the required scopes are selected: repo, workflow, read:org',
+        'Set an expiration date (recommend 90 days or No expiration)',
+        'Click "Generate token" at the bottom of the page',
+        'Copy the token immediately (you won\'t be able to see it again)',
+        'Paste the token in the "Personal Access Token" field above',
+        'Fill in the Repository Owner and Repository Name',
+        'Click "Test Connection" to verify access'
       ],
-      tokenUrl: 'https://github.com/settings/tokens/new?scopes=repo,workflow,read:org&description=OpenLuffy+Integration'
+      tokenUrl: 'https://github.com/settings/tokens/new?scopes=repo,workflow,read:org&description=OpenLuffy+Customer+Integration'
     }
   },
   {
@@ -212,6 +224,7 @@ const availableIntegrations = [
 ]
 
 function IntegrationsDashboard() {
+  const { activeCustomer } = useCustomer()
   const [connectedIntegrations, setConnectedIntegrations] = useState([])
   const [showAddModal, setShowAddModal] = useState(false)
   const [selectedToAdd, setSelectedToAdd] = useState(null)
@@ -220,10 +233,16 @@ function IntegrationsDashboard() {
   const [testingConnection, setTestingConnection] = useState(false)
   const [testResult, setTestResult] = useState(null)
 
-  // Fetch real connected integrations
+  // Fetch real connected integrations (per customer)
   useEffect(() => {
-    fetchConnectedIntegrations()
-  }, [])
+    if (activeCustomer) {
+      fetchConnectedIntegrations()
+    } else {
+      setConnectedIntegrations([])
+      setLoading(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCustomer])
 
   const fetchConnectedIntegrations = async () => {
     setLoading(true)
@@ -266,14 +285,26 @@ function IntegrationsDashboard() {
         actions: ['Open UI', 'Sync Apps', 'Configure'],
         url: 'http://argocd.local'
       }
-    } catch (error) {
+    } catch {
       return null
     }
   }
 
   const fetchGitHubStatus = async () => {
+    if (!activeCustomer) return null
+    
     try {
-      // TODO: Call GitHub API to get real status
+      // Fetch customer's GitHub config from backend API
+      const response = await fetch(`/api/customers/${activeCustomer.id}/integrations/github`)
+      
+      if (!response.ok) {
+        // Not configured yet
+        return null
+      }
+      
+      const config = await response.json()
+      const repoUrl = `https://github.com/${config.org}/${config.repo}`
+      
       return {
         id: 'github',
         name: 'GitHub',
@@ -281,13 +312,15 @@ function IntegrationsDashboard() {
         status: 'connected',
         statusText: 'Connected',
         metrics: {
-          'Repository': 'lebrick07/openluffy',
-          'Status': 'Ready to query'
+          'Repository': `${config.org}/${config.repo}`,
+          'Branch': config.branch || 'main',
+          'Customer': activeCustomer.name
         },
-        actions: ['View Repo', 'Workflows', 'Configure'],
-        url: 'https://github.com/lebrick07/openluffy'
+        actions: ['View Repo', 'Workflows', 'Configure', 'Remove'],
+        url: repoUrl,
+        config: config
       }
-    } catch (error) {
+    } catch {
       return null
     }
   }
@@ -313,7 +346,7 @@ function IntegrationsDashboard() {
         },
         actions: ['View Pods', 'Deployments', 'Configure']
       }
-    } catch (error) {
+    } catch {
       return null
     }
   }
@@ -332,37 +365,44 @@ function IntegrationsDashboard() {
     setTestResult(null)
 
     try {
-      // Test GitHub API with provided token and org
-      const response = await fetch('https://api.github.com/user', {
+      // Validate token by checking user
+      const userResponse = await fetch('https://api.github.com/user', {
         headers: {
           'Authorization': `token ${configData.token}`,
           'Accept': 'application/vnd.github.v3+json'
         }
       })
 
-      if (!response.ok) {
+      if (!userResponse.ok) {
         throw new Error('Invalid token or insufficient permissions')
       }
 
-      const userData = await response.json()
+      const userData = await userResponse.json()
 
-      // Check if org exists (if different from user)
-      if (configData.org && configData.org !== userData.login) {
-        const orgResponse = await fetch(`https://api.github.com/orgs/${configData.org}`, {
-          headers: {
-            'Authorization': `token ${configData.token}`,
-            'Accept': 'application/vnd.github.v3+json'
-          }
-        })
-
-        if (!orgResponse.ok) {
-          throw new Error(`Organization "${configData.org}" not found or no access`)
-        }
+      // Check if the repository exists
+      if (!configData.org || !configData.repo) {
+        throw new Error('Repository owner and name are required')
       }
+
+      const repoResponse = await fetch(`https://api.github.com/repos/${configData.org}/${configData.repo}`, {
+        headers: {
+          'Authorization': `token ${configData.token}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      })
+
+      if (!repoResponse.ok) {
+        if (repoResponse.status === 404) {
+          throw new Error(`Repository "${configData.org}/${configData.repo}" not found or no access`)
+        }
+        throw new Error('Unable to access repository')
+      }
+
+      const repoData = await repoResponse.json()
 
       setTestResult({ 
         success: true, 
-        message: `✅ Connected as ${userData.login}. Token verified!` 
+        message: `✅ Connected as ${userData.login}. Repository "${repoData.full_name}" accessible!` 
       })
     } catch (error) {
       setTestResult({ 
@@ -379,13 +419,33 @@ function IntegrationsDashboard() {
   }
 
   const handleSaveIntegration = async () => {
-    // TODO: Send config to backend to store credentials
-    console.log('Saving integration:', selectedToAdd.id, configData)
+    if (!activeCustomer) {
+      alert('No customer selected')
+      return
+    }
     
-    // For now, just close modal
-    // In production, this would save to backend and re-fetch integrations
-    setShowAddModal(false)
-    alert(`Integration configuration saved! (Backend API coming soon)`)
+    try {
+      const response = await fetch(`/api/customers/${activeCustomer.id}/integrations/${selectedToAdd.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(configData)
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to save integration')
+      }
+      
+      // Success - close modal and refresh
+      setShowAddModal(false)
+      setTestResult(null)
+      fetchConnectedIntegrations()
+      
+    } catch (error) {
+      alert(`Failed to save integration: ${error.message}`)
+    }
   }
 
   const handleAction = (integration, action) => {
@@ -393,8 +453,46 @@ function IntegrationsDashboard() {
       window.open(integration.url, '_blank')
     } else if (action === 'View Repo' && integration.url) {
       window.open(integration.url, '_blank')
+    } else if (action === 'Configure') {
+      handleConfigure(integration)
+    } else if (action === 'Remove') {
+      handleRemove(integration)
     } else {
       console.log(`Action: ${action} on ${integration.name}`)
+    }
+  }
+
+  const handleConfigure = (integration) => {
+    // Find the integration definition from availableIntegrations
+    const integrationDef = availableIntegrations.find(a => a.id === integration.id)
+    if (!integrationDef) return
+    
+    setSelectedToAdd(integrationDef)
+    setConfigData(integration.config || {})
+    setTestResult(null)
+    setShowAddModal(true)
+  }
+
+  const handleRemove = async (integration) => {
+    if (!activeCustomer) return
+    
+    if (!confirm(`Remove ${integration.name} integration for ${activeCustomer.name}?`)) {
+      return
+    }
+    
+    try {
+      const response = await fetch(`/api/customers/${activeCustomer.id}/integrations/${integration.id}`, {
+        method: 'DELETE'
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to remove integration')
+      }
+      
+      // Refresh integrations list
+      fetchConnectedIntegrations()
+    } catch (error) {
+      alert(`Failed to remove integration: ${error.message}`)
     }
   }
 
@@ -413,12 +511,31 @@ function IntegrationsDashboard() {
     )
   }
 
+  // Show message if no customer selected
+  if (!activeCustomer) {
+    return (
+      <div className="integrations-dashboard">
+        <div className="integrations-header">
+          <div className="header-content">
+            <h2>🔗 DevOps Integrations</h2>
+            <p>Select a customer to view their integrations</p>
+          </div>
+        </div>
+        <div className="empty-state">
+          <div className="empty-icon">🏢</div>
+          <h3>No Customer Selected</h3>
+          <p>Select a customer from the dropdown to view and manage their integrations.</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="integrations-dashboard">
       <div className="integrations-header">
         <div className="header-content">
           <h2>🔗 DevOps Integrations</h2>
-          <p>Connect your DevOps tools</p>
+          <p>Connect {activeCustomer.name}'s DevOps tools</p>
         </div>
         
         <div className="status-summary">
@@ -602,7 +719,7 @@ function IntegrationsDashboard() {
                   <button 
                     className="btn-test" 
                     onClick={handleTestConnection}
-                    disabled={!configData.token || !configData.org || testingConnection}
+                    disabled={!configData.token || !configData.org || !configData.repo || testingConnection}
                   >
                     {testingConnection ? '⏳ Testing...' : '🔍 Test Connection'}
                   </button>
