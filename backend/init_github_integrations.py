@@ -12,11 +12,11 @@ GITHUB_ORG = os.getenv('GITHUB_ORG', 'lebrick07')
 
 # Customer → GitHub repo mapping
 CUSTOMER_REPOS = {
-    'acme-corp': {'name': 'Acme Corp', 'repo': 'acme-corp-api'},
-    'openluffy': {'name': 'OpenLuffy', 'repo': 'openluffy'},
-    'philly-cheese-corp': {'name': 'Philly Cheese Corp', 'repo': 'philly-cheese-corp'},
-    'techstart': {'name': 'Techstart', 'repo': 'techstart-webapp'},
-    'widgetco': {'name': 'Widgetco', 'repo': 'widgetco-api'},
+    'acme-corp': {'name': 'Acme Corp', 'repo': 'acme-corp-api', 'stack': 'nodejs'},
+    'openluffy': {'name': 'OpenLuffy', 'repo': 'openluffy', 'stack': 'nodejs'},
+    'philly-cheese-corp': {'name': 'Philly Cheese Corp', 'repo': 'philly-cheese-corp', 'stack': 'nodejs'},
+    'techstart': {'name': 'Techstart', 'repo': 'techstart-webapp', 'stack': 'python'},
+    'widgetco': {'name': 'Widgetco', 'repo': 'widgetco-api', 'stack': 'golang'},
 }
 
 def init_github_integrations(db: Session) -> None:
@@ -38,7 +38,8 @@ def init_github_integrations(db: Session) -> None:
                 customer = Customer(
                     id=customer_id,
                     name=info['name'],
-                    repository=f"{GITHUB_ORG}/{info['repo']}"
+                    stack=info['stack'],
+                    github_repo=f"{GITHUB_ORG}/{info['repo']}"
                 )
                 db.add(customer)
                 db.commit()
