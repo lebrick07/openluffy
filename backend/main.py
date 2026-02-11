@@ -606,7 +606,7 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
     try:
         templates_dir = Path(__file__).parent / 'templates'
         
-        # Map stack to template files
+        # Map stack to template files (HELM CHART STRUCTURE - following OpenLuffy pattern)
         stack_templates = {
             'nodejs': {
                 '.github/workflows/ci.yaml': 'ci-nodejs.yaml',
@@ -617,8 +617,14 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
                 'package.json': 'package.json',
                 '.gitignore': 'gitignore',
                 'README.md': 'README.md',
-                'k8s/deployment.yaml': 'k8s-deployment.yaml',
-                'k8s/service.yaml': 'k8s-service.yaml',
+                'helm/app/Chart.yaml': 'helm/Chart.yaml',
+                'helm/app/values.yaml': 'helm/values.yaml',
+                'helm/app/values/dev.yaml': 'helm/values-dev.yaml',
+                'helm/app/values/preprod.yaml': 'helm/values-preprod.yaml',
+                'helm/app/values/prod.yaml': 'helm/values-prod.yaml',
+                'helm/app/templates/_helpers.tpl': 'helm/templates/_helpers.tpl',
+                'helm/app/templates/deployment.yaml': 'helm/templates/deployment.yaml',
+                'helm/app/templates/service.yaml': 'helm/templates/service.yaml',
             },
             'python': {
                 '.github/workflows/ci.yaml': 'ci-python.yaml',
@@ -629,8 +635,14 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
                 'requirements.txt': 'requirements.txt',
                 '.gitignore': 'gitignore',
                 'README.md': 'README.md',
-                'k8s/deployment.yaml': 'k8s-deployment.yaml',
-                'k8s/service.yaml': 'k8s-service.yaml',
+                'helm/app/Chart.yaml': 'helm/Chart.yaml',
+                'helm/app/values.yaml': 'helm/values.yaml',
+                'helm/app/values/dev.yaml': 'helm/values-dev.yaml',
+                'helm/app/values/preprod.yaml': 'helm/values-preprod.yaml',
+                'helm/app/values/prod.yaml': 'helm/values-prod.yaml',
+                'helm/app/templates/_helpers.tpl': 'helm/templates/_helpers.tpl',
+                'helm/app/templates/deployment.yaml': 'helm/templates/deployment.yaml',
+                'helm/app/templates/service.yaml': 'helm/templates/service.yaml',
             },
             'golang': {
                 '.github/workflows/ci.yaml': 'ci-golang.yaml',
@@ -641,8 +653,14 @@ def initialize_customer_repo(customer_id: str, customer_name: str, stack: str, g
                 'go.mod': 'go.mod',
                 '.gitignore': 'gitignore',
                 'README.md': 'README.md',
-                'k8s/deployment.yaml': 'k8s-deployment.yaml',
-                'k8s/service.yaml': 'k8s-service.yaml',
+                'helm/app/Chart.yaml': 'helm/Chart.yaml',
+                'helm/app/values.yaml': 'helm/values.yaml',
+                'helm/app/values/dev.yaml': 'helm/values-dev.yaml',
+                'helm/app/values/preprod.yaml': 'helm/values-preprod.yaml',
+                'helm/app/values/prod.yaml': 'helm/values-prod.yaml',
+                'helm/app/templates/_helpers.tpl': 'helm/templates/_helpers.tpl',
+                'helm/app/templates/deployment.yaml': 'helm/templates/deployment.yaml',
+                'helm/app/templates/service.yaml': 'helm/templates/service.yaml',
             }
         }
         
@@ -970,7 +988,10 @@ async def create_customer(request: Request):
                             'source': {
                                 'repoURL': f"https://github.com/{github['org']}/{github['repo']}.git",
                                 'targetRevision': github.get('branch', 'main'),
-                                'path': 'k8s'
+                                'path': 'helm/app',
+                                'helm': {
+                                    'valueFiles': [env['values_file']]
+                                }
                             },
                             'destination': {
                                 'server': 'https://kubernetes.default.svc',
