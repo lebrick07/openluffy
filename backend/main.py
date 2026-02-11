@@ -565,19 +565,47 @@ async def create_customer(request: Request):
                     'Dockerfile': 'dockerfile-nodejs',
                     'index.js': 'app-nodejs.js',
                     'package.json': 'package-nodejs.json',
+                    '.gitignore': 'gitignore-nodejs',
+                    'README.md': 'readme.md',
                 },
                 'python': {
                     '.github/workflows/ci.yaml': 'workflow-python.yaml',
                     'Dockerfile': 'dockerfile-python',
                     'main.py': 'app-python.py',
                     'requirements.txt': 'requirements-python.txt',
+                    '.gitignore': 'gitignore-python',
+                    'README.md': 'readme.md',
                 },
                 'go': {
                     '.github/workflows/ci.yaml': 'workflow-go.yaml',
                     'Dockerfile': 'dockerfile-go',
                     'main.go': 'app-go.go',
                     'go.mod': 'go-mod.txt',
+                    '.gitignore': 'gitignore-go',
+                    'README.md': 'readme.md',
                 }
+            }
+            
+            # Stack-specific instructions for README
+            stack_instructions = {
+                'nodejs': '''```bash
+npm install
+npm start
+```
+
+Visit: http://localhost:3000''',
+                'python': '''```bash
+pip install -r requirements.txt
+python main.py
+```
+
+Visit: http://localhost:8000''',
+                'go': '''```bash
+go mod download
+go run main.go
+```
+
+Visit: http://localhost:8080'''
             }
             
             if stack in stack_templates:
@@ -599,6 +627,8 @@ async def create_customer(request: Request):
                     content = content.replace('{{CUSTOMER_NAME}}', customer_name)
                     content = content.replace('{{GITHUB_ORG}}', github['org'])
                     content = content.replace('{{REPO_NAME}}', github['repo'])
+                    content = content.replace('{{STACK}}', stack.title())
+                    content = content.replace('{{STACK_INSTRUCTIONS}}', stack_instructions.get(stack, ''))
                     
                     # Push file to GitHub using GitHub API
                     file_url = f"https://api.github.com/repos/{github['org']}/{github['repo']}/contents/{target_path}"
