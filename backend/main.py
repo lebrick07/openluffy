@@ -1082,6 +1082,28 @@ async def create_customer(request: Request):
                         )
                         argocd_apps_created.append(app_name)
                         print(f"✅ Created ArgoCD app: {app_name}")
+                        
+                        # Trigger immediate sync (don't wait for 3min reconciliation loop)
+                        try:
+                            sync_patch = {
+                                'operation': {
+                                    'sync': {
+                                        'revision': target_branch
+                                    }
+                                }
+                            }
+                            custom_api.patch_namespaced_custom_object(
+                                group='argoproj.io',
+                                version='v1alpha1',
+                                namespace='argocd',
+                                plural='applications',
+                                name=app_name,
+                                body=sync_patch
+                            )
+                            print(f"🔄 Triggered immediate sync for: {app_name}")
+                        except Exception as sync_error:
+                            # Non-critical - ArgoCD will sync eventually
+                            print(f"⚠️ Couldn't trigger sync for {app_name}: {sync_error}")
                     except Exception as app_error:
                         if '409' in str(app_error):  # Already exists
                             argocd_apps_created.append(f"{app_name} (already exists)")
