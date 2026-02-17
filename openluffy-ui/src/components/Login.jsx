@@ -47,7 +47,7 @@ function Login({ onLoginSuccess }) {
       <div className="login-box">
         <div className="login-header">
           <img 
-            src="/openluffy-logo-navbar.jpg" 
+            src="/openluffy-logo.jpg" 
             alt="OpenLuffy" 
             className="login-logo"
           />
