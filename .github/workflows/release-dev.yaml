@@ -92,8 +92,47 @@ jobs:
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           git commit -m "chore(dev): update image tags to dev-${SHORT_SHA} [skip ci]" || echo "No changes"
           
-          # Pull with rebase to handle concurrent pushes
-          git pull --rebase origin develop || true
+          # Pull with rebase to handle concurrent pushes - retry up to 3 times
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES..."
+            
+            # Fetch latest
+            git fetch origin develop
+            
+            # Try to rebase
+            if git rebase origin/develop; then
+              echo "Rebase successful"
+              break
+            else
+              echo "Rebase failed, trying to resolve..."
+              
+              # If rebase failed, abort and try a different approach
+              git rebase --abort || true
+              
+              # Pull latest and re-apply our changes
+              git reset --hard HEAD~1  # Undo our commit
+              git pull origin develop  # Get latest
+              
+              # Re-apply changes
+              sed -i "s|tag:.*# backend|tag: dev-${SHORT_SHA} # backend|g" helm/openluffy/values/dev.yaml
+              sed -i "s|tag:.*# frontend|tag: dev-${SHORT_SHA} # frontend|g" helm/openluffy/values/dev.yaml
+              
+              git add helm/openluffy/values/dev.yaml
+              git commit -m "chore(dev): update image tags to dev-${SHORT_SHA} [skip ci]" || echo "No changes"
+              
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              sleep 2  # Brief pause before retry
+            fi
+          done
+          
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "Failed to rebase after $MAX_RETRIES attempts"
+            exit 1
+          fi
+          
           git push
 
   # Inject secrets into ArgoCD Applications
@@ -183,6 +222,48 @@ jobs:
           
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           git commit -m "chore(preprod): auto-promote dev-${SHORT_SHA} [skip ci]" || echo "No changes"
+          
+          # Pull with rebase to handle concurrent pushes - retry up to 3 times
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES..."
+            
+            # Fetch latest
+            git fetch origin develop
+            
+            # Try to rebase
+            if git rebase origin/develop; then
+              echo "Rebase successful"
+              break
+            else
+              echo "Rebase failed, trying to resolve..."
+              
+              # If rebase failed, abort and try a different approach
+              git rebase --abort || true
+              
+              # Pull latest and re-apply our changes
+              git reset --hard HEAD~1  # Undo our commit
+              git pull origin develop  # Get latest
+              
+              # Re-apply changes
+              sed -i "s|tag:.*# backend|tag: dev-${SHORT_SHA} # backend|g" helm/openluffy/values/preprod.yaml
+              sed -i "s|tag:.*# frontend|tag: dev-${SHORT_SHA} # frontend|g" helm/openluffy/values/preprod.yaml
+              
+              git add helm/openluffy/values/preprod.yaml
+              git commit -m "chore(preprod): auto-promote dev-${SHORT_SHA} [skip ci]" || echo "No changes"
+              
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              sleep 2  # Brief pause before retry
+            fi
+          done
+          
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "Failed to rebase after $MAX_RETRIES attempts"
+            exit 1
+          fi
+          
           git push
 
   # Summary
