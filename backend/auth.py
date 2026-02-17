@@ -448,5 +448,243 @@ async def revoke_session(
     return {"message": "Session revoked successfully"}
 
 
-# TODO: Implement password reset, email verification, change password
-# These will be added in the next iteration
+@router.post("/password-reset/request")
+async def request_password_reset(
+    request_data: PasswordResetRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Request a password reset email
+    """
+    user = db.query(User).filter(User.email == request_data.email).first()
+    
+    # Always return success even if user doesn't exist (security best practice)
+    if not user:
+        return {"message": "If the email exists, a password reset link has been sent"}
+    
+    # Generate reset token
+    reset_token = generate_random_token()
+    user.password_reset_token = reset_token
+    user.password_reset_sent_at = datetime.utcnow()
+    
+    db.commit()
+    
+    # TODO: Send password reset email
+    # For now, we'll just log the token (in production, send via email)
+    print(f"Password reset token for {user.email}: {reset_token}")
+    
+    return {"message": "If the email exists, a password reset link has been sent"}
+
+
+@router.post("/password-reset/confirm")
+async def confirm_password_reset(
+    request_data: PasswordResetConfirm,
+    db: Session = Depends(get_db)
+):
+    """
+    Confirm password reset with token and set new password
+    """
+    # Find user with this reset token
+    user = db.query(User).filter(
+        User.password_reset_token == request_data.token
+    ).first()
+    
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    
+    # Check if token is still valid (24 hours)
+    if user.password_reset_sent_at:
+        token_age = datetime.utcnow() - user.password_reset_sent_at
+        if token_age > timedelta(hours=24):
+            raise HTTPException(status_code=400, detail="Reset token has expired")
+    
+    # Validate new password
+    is_valid, error = validate_password_strength(request_data.new_password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error)
+    
+    # Update password
+    user.password_hash = hash_password(request_data.new_password)
+    user.password_reset_token = None
+    user.password_reset_sent_at = None
+    
+    # Revoke all existing sessions for security
+    db.query(UserSession).filter(
+        UserSession.user_id == user.id,
+        UserSession.is_active == True
+    ).update({"is_active": False, "revoked_at": datetime.utcnow()})
+    
+    # Audit log
+    audit = AuditLog(
+        user_id=user.id,
+        action="password_reset",
+        resource_type="user",
+        resource_id=str(user.id)
+    )
+    db.add(audit)
+    
+    db.commit()
+    
+    return {"message": "Password reset successfully"}
+
+
+@router.post("/change-password")
+async def change_password(
+    request_data: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Change password for authenticated user
+    """
+    # Verify current password
+    if not verify_password(request_data.current_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    # Validate new password
+    is_valid, error = validate_password_strength(request_data.new_password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error)
+    
+    # Update password
+    current_user.password_hash = hash_password(request_data.new_password)
+    
+    # Audit log
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="password_changed",
+        resource_type="user",
+        resource_id=str(current_user.id)
+    )
+    db.add(audit)
+    
+    db.commit()
+    
+    return {"message": "Password changed successfully"}
+
+
+@router.post("/verify-email/{token}")
+async def verify_email(
+    token: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Verify email address with token
+    """
+    user = db.query(User).filter(
+        User.email_verification_token == token
+    ).first()
+    
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid verification token")
+    
+    # Check if token is still valid (7 days)
+    if user.email_verification_sent_at:
+        token_age = datetime.utcnow() - user.email_verification_sent_at
+        if token_age > timedelta(days=7):
+            raise HTTPException(status_code=400, detail="Verification token has expired")
+    
+    # Mark email as verified
+    user.email_verified = True
+    user.email_verification_token = None
+    user.email_verification_sent_at = None
+    
+    # Audit log
+    audit = AuditLog(
+        user_id=user.id,
+        action="email_verified",
+        resource_type="user",
+        resource_id=str(user.id)
+    )
+    db.add(audit)
+    
+    db.commit()
+    
+    return {"message": "Email verified successfully"}
+
+
+@router.post("/resend-verification")
+async def resend_verification_email(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Resend email verification link
+    """
+    if current_user.email_verified:
+        return {"message": "Email already verified"}
+    
+    # Generate new verification token
+    verification_token = generate_random_token()
+    current_user.email_verification_token = verification_token
+    current_user.email_verification_sent_at = datetime.utcnow()
+    
+    db.commit()
+    
+    # TODO: Send verification email
+    # For now, we'll just log the token (in production, send via email)
+    print(f"Email verification token for {current_user.email}: {verification_token}")
+    
+    return {"message": "Verification email sent"}
+
+
+@router.post("/bootstrap/create-admin")
+async def bootstrap_create_admin(
+    request_data: RegisterRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Bootstrap endpoint to create the first admin user
+    Only works if no admin users exist in the system
+    """
+    # Check if any admin user already exists
+    existing_admin = db.query(User).filter(User.role == 'admin').first()
+    if existing_admin:
+        raise HTTPException(
+            status_code=403, 
+            detail="Admin user already exists. Use normal registration for additional users."
+        )
+    
+    # Validate password strength
+    is_valid, error = validate_password_strength(request_data.password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error)
+    
+    # Check if email already exists
+    existing_user = db.query(User).filter(User.email == request_data.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Create admin user
+    admin_user = User(
+        email=request_data.email,
+        username=request_data.username or request_data.email.split('@')[0],
+        first_name=request_data.first_name or "Admin",
+        last_name=request_data.last_name or "User",
+        password_hash=hash_password(request_data.password),
+        role='admin',  # Admin role
+        is_active=True,
+        email_verified=True,  # Auto-verify bootstrap admin
+        created_at=datetime.utcnow()
+    )
+    
+    db.add(admin_user)
+    db.flush()
+    
+    # Audit log
+    audit = AuditLog(
+        user_id=admin_user.id,
+        action="admin_user_bootstrapped",
+        resource_type="user",
+        resource_id=str(admin_user.id),
+        details={"email": admin_user.email, "role": "admin"}
+    )
+    db.add(audit)
+    
+    db.commit()
+    db.refresh(admin_user)
+    
+    return {
+        "message": "Admin user created successfully",
+        "user": admin_user.to_dict()
+    }
