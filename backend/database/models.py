@@ -95,23 +95,97 @@ class User(Base):
     __tablename__ = 'users'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String(100), unique=True, nullable=False)
-    email = Column(String(200), unique=True, nullable=False)
+    
+    # Identity
+    email = Column(String(200), unique=True, nullable=False, index=True)
+    username = Column(String(100), unique=True, nullable=True)  # Optional display name
+    
+    # Password authentication
     password_hash = Column(String(255), nullable=False)
-    role = Column(String(20), default='viewer')  # admin, viewer
+    
+    # Profile
+    first_name = Column(String(100))
+    last_name = Column(String(100))
+    
+    # Permissions
+    role = Column(String(20), default='viewer')  # admin, editor, viewer
     is_active = Column(Boolean, default=True)
+    email_verified = Column(Boolean, default=False)
+    email_verification_token = Column(String(64), nullable=True, index=True)
+    email_verification_sent_at = Column(DateTime, nullable=True)
+    
+    # Password reset
+    password_reset_token = Column(String(64), nullable=True, index=True)
+    password_reset_sent_at = Column(DateTime, nullable=True)
+    
+    # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime)
+    last_activity = Column(DateTime)
+    
+    # Relationships
+    sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
+    audit_logs = relationship("AuditLog", back_populates="user")
+    
+    def to_dict(self, include_sensitive=False):
+        data = {
+            'id': self.id,
+            'email': self.email,
+            'username': self.username,
+            'first_name': self.first_name,
+            'last_name': self.last_name,
+            'role': self.role,
+            'is_active': self.is_active,
+            'email_verified': self.email_verified,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'last_login': self.last_login.isoformat() if self.last_login else None
+        }
+        if include_sensitive:
+            data['email_verification_token'] = self.email_verification_token
+            data['password_reset_token'] = self.password_reset_token
+        return data
+
+
+class UserSession(Base):
+    """User sessions for authentication"""
+    __tablename__ = 'user_sessions'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    
+    # Session tracking
+    session_token = Column(String(64), unique=True, nullable=False, index=True)  # JWT jti
+    refresh_token = Column(String(64), unique=True, nullable=True, index=True)
+    
+    # Expiry
+    expires_at = Column(DateTime, nullable=False)
+    refresh_expires_at = Column(DateTime, nullable=True)
+    
+    # Device/context
+    user_agent = Column(String(500))
+    ip_address = Column(String(45))  # IPv4 or IPv6
+    device_name = Column(String(100))  # "Chrome on Mac", "iOS App", etc.
+    
+    # Status
+    is_active = Column(Boolean, default=True)
+    last_activity = Column(DateTime, default=datetime.utcnow)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    revoked_at = Column(DateTime, nullable=True)
+    
+    # Relationships
+    user = relationship("User", back_populates="sessions")
     
     def to_dict(self):
         return {
             'id': self.id,
-            'username': self.username,
-            'email': self.email,
-            'role': self.role,
+            'user_id': self.user_id,
+            'device_name': self.device_name,
+            'ip_address': self.ip_address,
             'is_active': self.is_active,
+            'last_activity': self.last_activity.isoformat() if self.last_activity else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_login': self.last_login.isoformat() if self.last_login else None
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None
         }
 
 
@@ -126,6 +200,9 @@ class AuditLog(Base):
     resource_id = Column(String(200))
     details = Column(JSON)
     timestamp = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="audit_logs")
     
     def to_dict(self):
         return {

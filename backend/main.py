@@ -15,8 +15,12 @@ from triage import triage_engine
 from luffy_agent import get_agent
 from database import init_db, get_db, check_db_connection, Customer, Integration, ProvisioningStep
 from init_github_integrations import init_github_integrations
+from auth import router as auth_router
 
 app = FastAPI(title="openluffy")
+
+# Include authentication routes
+app.include_router(auth_router)
 
 # Database initialization flag
 db_available = False
