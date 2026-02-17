@@ -119,26 +119,6 @@ function SettingsPage() {
           </div>
         </section>
 
-        {/* Cost Alerts */}
-        <section className="settings-section">
-          <h3>💰 Cost Management</h3>
-          <div className="setting-item">
-            <label>Alert threshold ({settings.costAlertThreshold}%)</label>
-            <input 
-              type="range" 
-              min="50" 
-              max="100" 
-              value={settings.costAlertThreshold} 
-              onChange={(e) => handleChange('costAlertThreshold', e.target.value)}
-              className="range-slider"
-            />
-            <div className="range-labels">
-              <span>50%</span>
-              <span>100%</span>
-            </div>
-          </div>
-        </section>
-
         {/* Danger Zone */}
         {activeCustomer && (
           <section className="settings-section danger-zone">

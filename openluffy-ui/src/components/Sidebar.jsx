@@ -9,12 +9,6 @@ function Sidebar({ activeView, onViewChange, isOpen = false }) {
       description: 'All deployments & environments'
     },
     {
-      id: 'pipelines',
-      icon: '🚀',
-      label: 'CI/CD Pipelines',
-      description: 'GitHub Actions & workflow runs'
-    },
-    {
       id: 'secrets',
       icon: '🔐',
       label: 'Secrets & Variables',
