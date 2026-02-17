@@ -2,7 +2,7 @@
 Database package for OpenLuffy
 """
 from .connection import engine, SessionLocal, init_db, get_db, get_db_session, check_db_connection
-from .models import Base, Customer, Integration, ProvisioningStep, User, AuditLog
+from .models import Base, Customer, Integration, ProvisioningStep, User, UserSession, AuditLog
 
 __all__ = [
     'engine',
@@ -16,5 +16,6 @@ __all__ = [
     'Integration',
     'ProvisioningStep',
     'User',
+    'UserSession',
     'AuditLog'
 ]
