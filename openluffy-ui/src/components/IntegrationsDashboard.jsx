@@ -295,7 +295,7 @@ function IntegrationsDashboard() {
     
     try {
       // Fetch customer's GitHub config from backend API
-      const response = await fetch(`/api/customers/${activeCustomer.id}/integrations/github`)
+      const response = await fetch(`/customers/${activeCustomer.id}/integrations/github`)
       
       if (!response.ok) {
         // Not configured yet
@@ -440,7 +440,7 @@ function IntegrationsDashboard() {
     }
     
     try {
-      const response = await fetch(`/api/customers/${activeCustomer.id}/integrations/${selectedToAdd.id}`, {
+      const response = await fetch(`/customers/${activeCustomer.id}/integrations/${selectedToAdd.id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -498,7 +498,7 @@ function IntegrationsDashboard() {
     }
     
     try {
-      const response = await fetch(`/api/customers/${activeCustomer.id}/integrations/${integration.id}`, {
+      const response = await fetch(`/customers/${activeCustomer.id}/integrations/${integration.id}`, {
         method: 'DELETE'
       })
       
@@ -521,7 +521,7 @@ function IntegrationsDashboard() {
     }
     
     try {
-      const response = await fetch(`/api/customers/${activeCustomer.id}/reinitialize`, {
+      const response = await fetch(`/customers/${activeCustomer.id}/reinitialize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})

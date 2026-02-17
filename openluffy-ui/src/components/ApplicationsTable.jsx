@@ -20,7 +20,7 @@ function ApplicationsTable({ selectedEnvironment }) {
     try {
       const [deploymentsRes, customersRes] = await Promise.all([
         fetch('/api/deployments'),
-        fetch('/api/customers')
+        fetch('/customers')
       ])
       
       const deploymentsData = await deploymentsRes.json()

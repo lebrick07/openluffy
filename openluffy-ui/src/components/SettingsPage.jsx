@@ -41,7 +41,7 @@ function SettingsPage() {
 
     try {
       const response = await fetch(
-        `/api/customers/${activeCustomer.id}?confirm=${activeCustomer.id}&delete_repo=false`,
+        `/customers/${activeCustomer.id}?confirm=${activeCustomer.id}&delete_repo=false`,
         {
           method: 'DELETE'
         }

@@ -37,7 +37,7 @@ function PendingApprovals() {
 
     setPromoting(customerId)
     try {
-      const response = await fetch(`/api/customers/${customerId}/promote-to-prod`, {
+      const response = await fetch(`/customers/${customerId}/promote-to-prod`, {
         method: 'POST'
       })
       

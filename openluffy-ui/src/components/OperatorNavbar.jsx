@@ -21,7 +21,7 @@ function OperatorNavbar({
 
   const fetchCustomers = async () => {
     try {
-      const res = await fetch('/api/customers')
+      const res = await fetch('/customers')
       const data = await res.json()
       setCustomers(data.customers || [])
     } catch (err) {

@@ -19,7 +19,7 @@ function CompactDashboard({ selectedCustomer }) {
     try {
       const [deploymentsRes, customersRes, pipelinesRes] = await Promise.all([
         fetch('/api/deployments'),
-        fetch('/api/customers'),
+        fetch('/customers'),
         fetch('/api/pipelines/status')
       ])
       

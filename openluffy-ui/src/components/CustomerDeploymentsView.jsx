@@ -18,7 +18,7 @@ function CustomerDeploymentsView({ selectedCustomer }) {
   const fetchData = async () => {
     try {
       const [customersRes, deploymentsRes] = await Promise.all([
-        fetch('/api/customers'),
+        fetch('/customers'),
         fetch('/api/deployments')
       ])
       
