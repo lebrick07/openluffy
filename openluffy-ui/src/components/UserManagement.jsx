@@ -24,7 +24,7 @@ function UserManagement() {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('authToken')
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/users`, {
+      const response = await fetch(`${API_BASE_URL}/v1/auth/users`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -44,7 +44,7 @@ function UserManagement() {
   const handleAddUser = async () => {
     try {
       const token = localStorage.getItem('authToken')
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/users`, {
+      const response = await fetch(`${API_BASE_URL}/v1/auth/users`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -69,7 +69,7 @@ function UserManagement() {
   const handleUpdateUser = async () => {
     try {
       const token = localStorage.getItem('authToken')
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/users/${selectedUser.id}`, {
+      const response = await fetch(`${API_BASE_URL}/v1/auth/users/${selectedUser.id}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -98,7 +98,7 @@ function UserManagement() {
     
     try {
       const token = localStorage.getItem('authToken')
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/users/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/v1/auth/users/${userId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
