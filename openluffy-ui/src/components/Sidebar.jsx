@@ -18,6 +18,12 @@ function Sidebar({ activeView, onViewChange, isOpen = false }) {
       description: 'GitHub Actions & workflow runs'
     },
     {
+      id: 'secrets',
+      icon: '🔐',
+      label: 'Secrets & Variables',
+      description: 'Environment secrets & config'
+    },
+    {
       id: 'pipeline-config',
       icon: '⚙️',
       label: 'Pipeline Config',

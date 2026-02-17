@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useCustomer } from '../contexts/CustomerContext'
 import { getCurrentUser } from '../utils/auth'
 import UserManagement from './UserManagement'
-import SecretsVariables from './SecretsVariables'
 import './SettingsPage.css'
 
 function SettingsPage() {
@@ -92,11 +91,6 @@ function SettingsPage() {
             <UserManagement />
           </section>
         )}
-
-        {/* Secrets & Variables */}
-        <section className="settings-section">
-          <SecretsVariables />
-        </section>
 
         {/* Notifications */}
         <section className="settings-section">

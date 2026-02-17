@@ -1,16 +1,20 @@
 import { useState } from 'react'
+import { useCustomer } from '../contexts/CustomerContext'
 import './SecretsVariables.css'
 
 function SecretsVariables() {
+  const { activeCustomer, customers } = useCustomer()
+  const [selectedCustomer, setSelectedCustomer] = useState(null)
+  
   const [secrets, setSecrets] = useState([
-    { id: 1, key: 'AWS_ACCESS_KEY', value: '••••••••••••', type: 'secret', scope: 'all' },
-    { id: 2, key: 'AWS_SECRET_KEY', value: '••••••••••••', type: 'secret', scope: 'all' },
-    { id: 3, key: 'GITHUB_TOKEN', value: 'ghp_••••••••••••', type: 'secret', scope: 'all' },
-    { id: 4, key: 'SLACK_WEBHOOK_URL', value: 'https://hooks.slack.com/••••', type: 'secret', scope: 'prod' },
-    { id: 5, key: 'DATABASE_URL', value: 'postgres://user:••••@host/db', type: 'secret', scope: 'all' },
-    { id: 6, key: 'API_BASE_URL', value: 'https://api.example.com', type: 'variable', scope: 'all' },
-    { id: 7, key: 'LOG_LEVEL', value: 'info', type: 'variable', scope: 'all' },
-    { id: 8, key: 'MAX_RETRIES', value: '3', type: 'variable', scope: 'dev' }
+    { id: 1, key: 'AWS_ACCESS_KEY', value: '••••••••••••', type: 'secret', scope: 'all', customer: null },
+    { id: 2, key: 'AWS_SECRET_KEY', value: '••••••••••••', type: 'secret', scope: 'all', customer: null },
+    { id: 3, key: 'GITHUB_TOKEN', value: 'ghp_••••••••••••', type: 'secret', scope: 'all', customer: null },
+    { id: 4, key: 'SLACK_WEBHOOK_URL', value: 'https://hooks.slack.com/••••', type: 'secret', scope: 'prod', customer: 'openluffy' },
+    { id: 5, key: 'DATABASE_URL', value: 'postgres://user:••••@host/db', type: 'secret', scope: 'all', customer: 'openluffy' },
+    { id: 6, key: 'API_BASE_URL', value: 'https://api.example.com', type: 'variable', scope: 'all', customer: 'global-movers' },
+    { id: 7, key: 'LOG_LEVEL', value: 'info', type: 'variable', scope: 'all', customer: 'global-movers' },
+    { id: 8, key: 'MAX_RETRIES', value: '3', type: 'variable', scope: 'dev', customer: null }
   ])
 
   const [showAddModal, setShowAddModal] = useState(false)
@@ -22,21 +26,30 @@ function SecretsVariables() {
     key: '',
     value: '',
     type: 'secret',
-    scope: 'all'
+    scope: 'all',
+    customer: null
   })
 
+  // Filter by selected customer (or show global if no customer selected)
+  const customerFilteredSecrets = selectedCustomer === 'global'
+    ? secrets.filter(s => s.customer === null)
+    : selectedCustomer
+      ? secrets.filter(s => s.customer === selectedCustomer || s.customer === null)
+      : secrets.filter(s => s.customer === null)
+
   const filteredSecrets = filterType === 'all' 
-    ? secrets 
-    : secrets.filter(s => s.type === filterType)
+    ? customerFilteredSecrets 
+    : customerFilteredSecrets.filter(s => s.type === filterType)
 
   const handleAdd = () => {
     const newEntry = {
       id: Date.now(),
-      ...newItem
+      ...newItem,
+      customer: selectedCustomer === 'global' ? null : selectedCustomer
     }
     setSecrets([...secrets, newEntry])
     setShowAddModal(false)
-    setNewItem({ key: '', value: '', type: 'secret', scope: 'all' })
+    setNewItem({ key: '', value: '', type: 'secret', scope: 'all', customer: null })
   }
 
   const handleEdit = () => {
@@ -55,11 +68,24 @@ function SecretsVariables() {
       <div className="section-header">
         <div>
           <h3>🔐 Secrets & Variables</h3>
-          <p>Manage environment secrets and configuration variables</p>
+          <p>Manage environment secrets and configuration variables per customer</p>
         </div>
         <button className="btn-primary" onClick={() => setShowAddModal(true)}>
           + Add Secret/Variable
         </button>
+      </div>
+
+      <div className="customer-selector">
+        <label>Customer:</label>
+        <select 
+          value={selectedCustomer || 'global'}
+          onChange={(e) => setSelectedCustomer(e.target.value === 'global' ? 'global' : e.target.value)}
+        >
+          <option value="global">🌍 Global (Platform-wide)</option>
+          {customers.map(c => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
       </div>
 
       <div className="filter-tabs">

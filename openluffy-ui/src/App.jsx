@@ -8,6 +8,7 @@ import PendingApprovals from './components/PendingApprovals'
 import IntegrationsDashboard from './components/IntegrationsDashboard'
 import PipelinesView from './components/PipelinesView'
 import PipelineConfig from './components/PipelineConfig'
+import SecretsVariables from './components/SecretsVariables'
 import CreateCustomerWizard from './components/CreateCustomerWizard'
 import AIChatPanel from './components/AIChatPanel'
 import SettingsPage from './components/SettingsPage'
@@ -70,6 +71,12 @@ function AppContent() {
         )
       case 'pipelines':
         return <PipelinesView />
+      case 'secrets':
+        return (
+          <div className="view-container" style={{ padding: '1.5rem 2rem' }}>
+            <SecretsVariables />
+          </div>
+        )
       case 'pipeline-config':
         return <PipelineConfig />
       case 'approvals':
