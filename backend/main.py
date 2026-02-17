@@ -26,6 +26,11 @@ from api_tokens import (
     list_api_tokens, create_api_token, get_api_token, update_api_token,
     revoke_api_token, rotate_api_token, list_available_scopes
 )
+from danger_zone import (
+    delete_all_deployments, reset_all_secrets, disable_customer,
+    delete_customer_permanently, transfer_customer_ownership,
+    revoke_all_customer_tokens
+)
 
 app = FastAPI(title="openluffy")
 
@@ -53,6 +58,14 @@ app.add_api_route("/api/v1/tokens/{token_id}", get_api_token, methods=["GET"], t
 app.add_api_route("/api/v1/tokens/{token_id}", update_api_token, methods=["PATCH"], tags=["tokens"])
 app.add_api_route("/api/v1/tokens/{token_id}", revoke_api_token, methods=["DELETE"], tags=["tokens"])
 app.add_api_route("/api/v1/tokens/{token_id}/rotate", rotate_api_token, methods=["POST"], tags=["tokens"])
+
+# Danger Zone routes (per-customer destructive actions)
+app.add_api_route("/api/v1/customers/{customer_id}/danger-zone/delete-deployments", delete_all_deployments, methods=["POST"], tags=["danger-zone"])
+app.add_api_route("/api/v1/customers/{customer_id}/danger-zone/reset-secrets", reset_all_secrets, methods=["POST"], tags=["danger-zone"])
+app.add_api_route("/api/v1/customers/{customer_id}/danger-zone/disable", disable_customer, methods=["POST"], tags=["danger-zone"])
+app.add_api_route("/api/v1/customers/{customer_id}/danger-zone/delete-permanent", delete_customer_permanently, methods=["POST"], tags=["danger-zone"])
+app.add_api_route("/api/v1/customers/{customer_id}/danger-zone/transfer-ownership", transfer_customer_ownership, methods=["POST"], tags=["danger-zone"])
+app.add_api_route("/api/v1/customers/{customer_id}/danger-zone/revoke-tokens", revoke_all_customer_tokens, methods=["POST"], tags=["danger-zone"])
 
 # Database initialization flag
 db_available = False
