@@ -232,13 +232,21 @@ async def login(
     """
     Login with email and password
     """
+    # DEBUG: Log incoming request
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(f"LOGIN ATTEMPT: email='{request_data.email}' password_len={len(request_data.password)} password_repr={repr(request_data.password)}")
+    
     # Find user
     user = db.query(User).filter(User.email == request_data.email).first()
     if not user:
+        logger.warning(f"LOGIN FAILED: User not found for email '{request_data.email}'")
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     # Verify password
-    if not verify_password(request_data.password, user.password_hash):
+    password_valid = verify_password(request_data.password, user.password_hash)
+    if not password_valid:
+        logger.warning(f"LOGIN FAILED: Invalid password for '{request_data.email}'. Password received: {repr(request_data.password[:5])}... (len={len(request_data.password)})")
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     # Check if user is active
