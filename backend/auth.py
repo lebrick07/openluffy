@@ -73,12 +73,22 @@ async def get_current_user(
     db: Session = Depends(get_db)
 ) -> User:
     """
-    Dependency to extract and validate JWT token, return current user
+    Dependency to extract and validate JWT or API token, return current user
+    Supports both JWT (standard sessions) and API tokens (programmatic access)
     """
     token = extract_bearer_token(authorization)
     if not token:
         raise HTTPException(status_code=401, detail="Missing authentication token")
     
+    # Try API token authentication first (tokens starting with "olf_")
+    if token.startswith("olf_"):
+        from api_tokens import get_current_user_from_token
+        user = await get_current_user_from_token(authorization, db)
+        if user:
+            return user
+        raise HTTPException(status_code=401, detail="Invalid API token")
+    
+    # Fall back to JWT authentication
     payload = decode_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")

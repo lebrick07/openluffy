@@ -5,7 +5,8 @@ from .connection import engine, SessionLocal, init_db, get_db, get_db_session, c
 from .models import (
     Base, Customer, Integration, ProvisioningStep, 
     User, UserSession, AuditLog,
-    Group, UserGroup, GroupCustomerAccess, UserCustomerAccess
+    Group, UserGroup, GroupCustomerAccess, UserCustomerAccess,
+    APIToken
 )
 
 __all__ = [
@@ -25,5 +26,6 @@ __all__ = [
     'Group',
     'UserGroup',
     'GroupCustomerAccess',
-    'UserCustomerAccess'
+    'UserCustomerAccess',
+    'APIToken'
 ]
