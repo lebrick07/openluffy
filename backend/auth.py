@@ -37,7 +37,7 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    username: str
     password: str
 
 
@@ -239,24 +239,17 @@ async def login(
     db: Session = Depends(get_db)
 ):
     """
-    Login with email and password
+    Login with username and password
     """
-    # DEBUG: Log incoming request
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.warning(f"LOGIN ATTEMPT: email='{request_data.email}' password_len={len(request_data.password)} password_repr={repr(request_data.password)}")
-    
-    # Find user
-    user = db.query(User).filter(User.email == request_data.email).first()
+    # Find user by username
+    user = db.query(User).filter(User.username == request_data.username).first()
     if not user:
-        logger.warning(f"LOGIN FAILED: User not found for email '{request_data.email}'")
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="Invalid username or password")
     
     # Verify password
     password_valid = verify_password(request_data.password, user.password_hash)
     if not password_valid:
-        logger.warning(f"LOGIN FAILED: Invalid password for '{request_data.email}'. Password received: {repr(request_data.password[:5])}... (len={len(request_data.password)})")
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="Invalid username or password")
     
     # Check if user is active
     if not user.is_active:

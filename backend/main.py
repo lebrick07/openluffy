@@ -127,11 +127,18 @@ async def startup_event():
                     db_available = True
                     print("✅ Database connection successful")
                     
+                    # Create default admin user if database is empty
+                    from database import SessionLocal
+                    db = SessionLocal()
+                    try:
+                        create_default_admin(db)
+                    finally:
+                        db.close()
+                    
                     # Migrate existing integrations_store to database
                     await migrate_integrations_to_db()
                     
                     # Initialize GitHub integrations for all customers
-                    from database import SessionLocal
                     db = SessionLocal()
                     try:
                         init_github_integrations(db)
@@ -154,6 +161,51 @@ async def startup_event():
                     break
     else:
         print("ℹ️ DATABASE_URL not set - using file storage")
+
+
+def create_default_admin(db):
+    """
+    Create default admin user if database is empty
+    Username: admin
+    Password: from ADMIN_PASSWORD env var or auto-generated
+    """
+    from database import User
+    from auth_utils import hash_password
+    from datetime import datetime
+    import secrets
+    
+    # Check if any users exist
+    user_count = db.query(User).count()
+    if user_count > 0:
+        print("ℹ️ Users already exist, skipping default admin creation")
+        return
+    
+    # Get password from environment or generate random one
+    admin_password = os.getenv('ADMIN_PASSWORD', None)
+    if not admin_password:
+        admin_password = secrets.token_urlsafe(16)
+        print(f"🔐 Generated random admin password: {admin_password}")
+        print("⚠️ SAVE THIS PASSWORD! Set ADMIN_PASSWORD env var to use a custom password.")
+    
+    # Create default admin user
+    admin = User(
+        username='admin',
+        email='admin@openluffy.local',
+        password_hash=hash_password(admin_password),
+        first_name='Admin',
+        last_name='User',
+        role='admin',
+        is_active=True,
+        email_verified=True,
+        created_at=datetime.utcnow()
+    )
+    
+    db.add(admin)
+    db.commit()
+    
+    print(f"✅ Default admin user created: username='admin'")
+    if not os.getenv('ADMIN_PASSWORD'):
+        print(f"🔑 Login with: username=admin, password={admin_password}")
 
 
 async def migrate_integrations_to_db():
