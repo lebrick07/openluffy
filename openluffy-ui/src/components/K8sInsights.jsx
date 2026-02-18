@@ -23,7 +23,7 @@ function K8sInsights() {
     try {
       const [deploymentsRes, customersRes] = await Promise.all([
         fetch('/api/deployments'),
-        fetch('/customers')
+        fetch('/api/customers')
       ])
       
       const deploymentsData = await deploymentsRes.json()

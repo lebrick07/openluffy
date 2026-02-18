@@ -11,7 +11,7 @@ function CustomerSelector({ selectedCustomer, onCustomerChange }) {
 
   const fetchCustomers = async () => {
     try {
-      const response = await fetch('/customers')
+      const response = await fetch('/api/customers')
       const data = await response.json()
       setCustomers(data.customers || [])
     } catch (error) {

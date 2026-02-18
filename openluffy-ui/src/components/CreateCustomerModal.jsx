@@ -41,7 +41,7 @@ function CreateCustomerModal({ onClose, onCustomerCreated }) {
     setCreating(true)
     
     try {
-      const response = await fetch('/customers/create', {
+      const response = await fetch('/api/customers/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
