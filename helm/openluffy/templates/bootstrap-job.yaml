@@ -1,0 +1,76 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "openluffy.fullname" . }}-bootstrap
+  labels:
+    {{- include "openluffy.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  ttlSecondsAfterFinished: 300  # Keep logs for 5 minutes
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "openluffy.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: bootstrap
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: bootstrap
+        image: curlimages/curl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          
+          echo "=== OpenLuffy Bootstrap ==="
+          echo "Waiting for backend to be ready..."
+          
+          # Wait for backend service to be available (max 2 minutes)
+          for i in $(seq 1 24); do
+            if curl -sf http://{{ include "openluffy.fullname" . }}-backend:8000/healthz > /dev/null 2>&1; then
+              echo "Backend is ready!"
+              break
+            fi
+            echo "Waiting for backend... ($i/24)"
+            sleep 5
+          done
+          
+          echo ""
+          echo "Creating admin user..."
+          
+          # Call bootstrap endpoint
+          RESPONSE=$(curl -sf -X POST \
+            -H "Content-Type: application/json" \
+            http://{{ include "openluffy.fullname" . }}-backend:8000/v1/auth/bootstrap/create-admin \
+            || echo "FAILED")
+          
+          if [ "$RESPONSE" = "FAILED" ]; then
+            echo ""
+            echo "Bootstrap failed or already complete."
+            echo "This is expected if the database already has users."
+            exit 0
+          fi
+          
+          # Extract credentials from response
+          USERNAME=$(echo "$RESPONSE" | grep -o '"username":"[^"]*"' | cut -d'"' -f4)
+          PASSWORD=$(echo "$RESPONSE" | grep -o '"password":"[^"]*"' | cut -d'"' -f4)
+          
+          echo ""
+          echo "========================================="
+          echo "✓ Admin user created successfully!"
+          echo "========================================="
+          echo ""
+          echo "Username: $USERNAME"
+          echo "Password: $PASSWORD"
+          echo ""
+          echo "SAVE THIS PASSWORD - it will not be shown again!"
+          echo "========================================="
+          echo ""
+          echo "Login at: http://{{ .Values.domain }}"
+          echo ""
