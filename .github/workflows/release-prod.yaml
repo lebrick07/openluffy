@@ -1,6 +1,5 @@
 name: Release - Production
 
-# Runs ONLY on PR merge from develop → main
 on:
   pull_request:
     types: [closed]
@@ -11,36 +10,31 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # Promote images and deploy to production - ALL IN ONE JOB
-  promote-and-deploy:
-    name: Promote & Deploy to Production
+  # Stage 1: Promote Backend
+  promote-backend:
+    name: Promote Backend
     runs-on: openluffy-runner
     if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
     permissions:
-      contents: write
       packages: write
-
+    outputs:
+      dev_sha: ${{ steps.find-sha.outputs.dev_sha }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Find dev SHA that was merged
-        id: find-dev-sha
+      - name: Find dev SHA
+        id: find-sha
         run: |
           DEV_SHA=$(git log --merges -1 --pretty=format:%P | awk '{print $2}')
-          if [ -z "$DEV_SHA" ]; then
-            DEV_SHA=${{ github.sha }}
-          fi
+          [ -z "$DEV_SHA" ] && DEV_SHA=${{ github.sha }}
           SHORT_DEV_SHA=$(echo $DEV_SHA | cut -c1-7)
           SHORT_MAIN_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          
           echo "dev_sha=$SHORT_DEV_SHA" >> $GITHUB_OUTPUT
           echo "main_sha=$SHORT_MAIN_SHA" >> $GITHUB_OUTPUT
-          echo "📦 Promoting dev-${SHORT_DEV_SHA} → prod-${SHORT_MAIN_SHA}"
 
-      - name: Log in to Container Registry
+      - name: Log in to Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -49,93 +43,124 @@ jobs:
 
       - name: Promote backend image
         run: |
-          DEV_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:dev-${{ steps.find-dev-sha.outputs.dev_sha }}"
-          PROD_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:prod-${{ steps.find-dev-sha.outputs.main_sha }}"
+          DEV_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:dev-${{ steps.find-sha.outputs.dev_sha }}"
+          PROD_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:prod-${{ steps.find-sha.outputs.main_sha }}"
           LATEST_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest"
           
-          echo "Pulling tested image: $DEV_TAG"
           docker pull $DEV_TAG
-          
-          echo "Tagging as: $PROD_TAG"
           docker tag $DEV_TAG $PROD_TAG
           docker tag $DEV_TAG $LATEST_TAG
-          
-          echo "Pushing production tags"
           docker push $PROD_TAG
           docker push $LATEST_TAG
-          
-          echo "✅ Backend promoted: dev-${{ steps.find-dev-sha.outputs.dev_sha }} → prod-${{ steps.find-dev-sha.outputs.main_sha }}"
+
+  # Stage 2: Scan Backend
+  scan-backend:
+    name: Scan Backend
+    runs-on: openluffy-runner
+    needs: [promote-backend]
+    steps:
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:prod-${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-backend.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-backend.sarif'
+
+  # Stage 3: Promote Frontend
+  promote-frontend:
+    name: Promote Frontend
+    runs-on: openluffy-runner
+    needs: [promote-backend]
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find dev SHA
+        id: find-sha
+        run: |
+          DEV_SHA=$(git log --merges -1 --pretty=format:%P | awk '{print $2}')
+          [ -z "$DEV_SHA" ] && DEV_SHA=${{ github.sha }}
+          SHORT_DEV_SHA=$(echo $DEV_SHA | cut -c1-7)
+          SHORT_MAIN_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "dev_sha=$SHORT_DEV_SHA" >> $GITHUB_OUTPUT
+          echo "main_sha=$SHORT_MAIN_SHA" >> $GITHUB_OUTPUT
+
+      - name: Log in to Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Promote frontend image
         run: |
-          DEV_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:dev-${{ steps.find-dev-sha.outputs.dev_sha }}"
-          PROD_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:prod-${{ steps.find-dev-sha.outputs.main_sha }}"
+          DEV_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:dev-${{ steps.find-sha.outputs.dev_sha }}"
+          PROD_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:prod-${{ steps.find-sha.outputs.main_sha }}"
           LATEST_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest"
           
-          echo "Pulling tested image: $DEV_TAG"
           docker pull $DEV_TAG
-          
-          echo "Tagging as: $PROD_TAG"
           docker tag $DEV_TAG $PROD_TAG
           docker tag $DEV_TAG $LATEST_TAG
-          
-          echo "Pushing production tags"
           docker push $PROD_TAG
           docker push $LATEST_TAG
-          
-          echo "✅ Frontend promoted: dev-${{ steps.find-dev-sha.outputs.dev_sha }} → prod-${{ steps.find-dev-sha.outputs.main_sha }}"
 
-      - name: Update production manifests
+  # Stage 4: Scan Frontend
+  scan-frontend:
+    name: Scan Frontend
+    runs-on: openluffy-runner
+    needs: [promote-frontend]
+    steps:
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:prod-${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-frontend.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-frontend.sarif'
+
+  # Stage 5: Deploy to Production
+  deploy-prod:
+    name: Deploy to Production
+    runs-on: openluffy-runner
+    needs: [scan-backend, scan-frontend]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update prod manifests
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          echo "Updating production environment with tag: prod-${SHORT_SHA}"
-          
           sed -i "s|tag:.*# backend|tag: prod-${SHORT_SHA} # backend|g" helm/openluffy/values/prod.yaml
           sed -i "s|tag:.*# frontend|tag: prod-${SHORT_SHA} # frontend|g" helm/openluffy/values/prod.yaml
-          
-      - name: Commit production manifest changes
+
+      - name: Commit manifests
         run: |
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'actions@github.com'
           git add helm/openluffy/values/prod.yaml
-          
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          git commit -m "chore(prod): promote to prod-${SHORT_SHA} [skip ci]" || echo "No changes"
-          
-          MAX_RETRIES=3
-          RETRY_COUNT=0
-          
-          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES..."
-            git fetch origin main
-            
-            if git rebase origin/main; then
-              echo "Rebase successful"
-              break
-            else
-              git rebase --abort || true
-              git reset --hard HEAD~1
-              git pull origin main
-              
-              sed -i "s|tag:.*# backend|tag: prod-${SHORT_SHA} # backend|g" helm/openluffy/values/prod.yaml
-              sed -i "s|tag:.*# frontend|tag: prod-${SHORT_SHA} # frontend|g" helm/openluffy/values/prod.yaml
-              
-              git add helm/openluffy/values/prod.yaml
-              git commit -m "chore(prod): promote to prod-${SHORT_SHA} [skip ci]" || echo "No changes"
-              
-              RETRY_COUNT=$((RETRY_COUNT + 1))
-              sleep 2
-            fi
-          done
-          
-          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-            echo "Failed to rebase after $MAX_RETRIES attempts"
-            exit 1
-          fi
-          
+          git commit -m "chore(prod): deploy prod-${SHORT_SHA} [skip ci]" || echo "No changes"
+          git pull --rebase origin main || true
           git push
 
-      - name: Inject secrets to production
+      - name: Inject secrets to ArgoCD
         run: |
           kubectl patch application openluffy-prod -n argocd --type merge --patch '
           spec:
@@ -147,17 +172,3 @@ jobs:
                   - name: secrets.githubToken
                     value: "${{ secrets.GH_PAT }}"
           '
-          echo "✅ Production secrets injected"
-
-      - name: Summary
-        run: |
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          echo "🏴‍☠️ OpenLuffy Production Release Complete"
-          echo ""
-          echo "✅ Images promoted from dev-${{ steps.find-dev-sha.outputs.dev_sha }} → prod-${SHORT_SHA}"
-          echo "✅ Secrets injected to production"
-          echo "✅ Production manifest updated"
-          echo ""
-          echo "Production: http://prod.openluffy.local"
-          echo ""
-          echo "Check ArgoCD: http://argocd.local"
