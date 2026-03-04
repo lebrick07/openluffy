@@ -13,7 +13,7 @@ jobs:
   # Stage 1: Source Code Security Scan
   source-security:
     name: Source Security Scan
-    runs-on: ubuntu-latest
+    runs-on: openluffy-runner
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,7 +28,7 @@ jobs:
   # Stage 2: Code Quality - Backend
   code-quality-backend:
     name: Code Quality - Backend
-    runs-on: ubuntu-latest
+    runs-on: openluffy-runner
     needs: [source-security]
     steps:
       - uses: actions/checkout@v4
@@ -60,7 +60,7 @@ jobs:
   # Stage 3: Code Quality - Frontend
   code-quality-frontend:
     name: Code Quality - Frontend
-    runs-on: ubuntu-latest
+    runs-on: openluffy-runner
     needs: [source-security]
     steps:
       - uses: actions/checkout@v4
@@ -86,7 +86,7 @@ jobs:
   # Stage 4: Backend - Build & Scan
   build-scan-backend:
     name: Build & Scan Backend
-    runs-on: ubuntu-latest
+    runs-on: openluffy-runner
     needs: [code-quality-backend]
     steps:
       - uses: actions/checkout@v4
@@ -123,7 +123,7 @@ jobs:
   # Stage 5: Frontend - Build & Scan
   build-scan-frontend:
     name: Build & Scan Frontend
-    runs-on: ubuntu-latest
+    runs-on: openluffy-runner
     needs: [code-quality-frontend]
     steps:
       - uses: actions/checkout@v4
@@ -160,7 +160,7 @@ jobs:
   # Stage 6: Tests
   tests:
     name: Integration Tests
-    runs-on: ubuntu-latest
+    runs-on: openluffy-runner
     needs: [build-scan-backend, build-scan-frontend]
     steps:
       - uses: actions/checkout@v4
