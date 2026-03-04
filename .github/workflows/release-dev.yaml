@@ -142,8 +142,18 @@ jobs:
     needs: [build-and-push]
     
     steps:
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/arm64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+          kubectl version --client
+          
       - name: Update ArgoCD Applications with secret parameter
         run: |
+          # Runner is in-cluster, use ServiceAccount credentials
+          export KUBECONFIG=/var/run/secrets/kubernetes.io/serviceaccount/kubeconfig || true
+          
           # Update openluffy-dev Application
           kubectl patch application openluffy-dev -n argocd --type merge --patch '
           spec:
