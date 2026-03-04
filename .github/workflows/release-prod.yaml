@@ -96,7 +96,7 @@ jobs:
   # Inject secrets into ArgoCD Application
   inject-secrets:
     name: Inject Secrets to ArgoCD
-    runs-on: self-hosted
+    runs-on: openluffy-runner
     needs: [build-and-push]
     
     steps:
