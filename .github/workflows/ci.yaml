@@ -14,7 +14,7 @@ jobs:
   # Step 1: Security Scans
   security-scans:
     name: Security Scans
-    runs-on: ubuntu-latest
+    runs-on: openluffy-runner
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,7 +37,7 @@ jobs:
   # Step 2: Code Quality Scans (Backend)
   code-quality-backend:
     name: Code Quality - Backend
-    runs-on: ubuntu-latest
+    runs-on: openluffy-runner
     needs: [security-scans]
     steps:
       - uses: actions/checkout@v4
@@ -69,7 +69,7 @@ jobs:
   # Step 2: Code Quality Scans (Frontend)
   code-quality-frontend:
     name: Code Quality - Frontend
-    runs-on: ubuntu-latest
+    runs-on: openluffy-runner
     needs: [security-scans]
     steps:
       - uses: actions/checkout@v4
@@ -95,7 +95,7 @@ jobs:
   # Step 3: Docker Build & Security Scan
   docker-build-and-scan:
     name: Docker Build & Security Scan
-    runs-on: ubuntu-latest
+    runs-on: openluffy-runner
     needs: [code-quality-backend, code-quality-frontend]
     steps:
       - name: Checkout code
@@ -151,7 +151,7 @@ jobs:
   # Step 4: Integration Tests
   integration-tests:
     name: Integration Tests
-    runs-on: ubuntu-latest
+    runs-on: openluffy-runner
     needs: [docker-build-and-scan]
     steps:
       - uses: actions/checkout@v4

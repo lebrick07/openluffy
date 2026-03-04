@@ -1,6 +1,6 @@
 name: Release - Production
 
-# Runs ONLY on PR merge to main - production deployment
+# Runs ONLY on PR merge from develop → main
 on:
   pull_request:
     types: [closed]
@@ -11,30 +11,26 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # Promote tested dev images to production
-  promote-images:
-    name: Promote Dev Images to Production
-    runs-on: ubuntu-latest
+  # Promote images and deploy to production - ALL IN ONE JOB
+  promote-and-deploy:
+    name: Promote & Deploy to Production
+    runs-on: openluffy-runner
     if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
     permissions:
       contents: write
       packages: write
-    outputs:
-      dev_sha: ${{ steps.find-dev-sha.outputs.dev_sha }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Need full history to find merge base
+          fetch-depth: 0
 
       - name: Find dev SHA that was merged
         id: find-dev-sha
         run: |
-          # Get the second parent of merge commit (the develop branch HEAD)
           DEV_SHA=$(git log --merges -1 --pretty=format:%P | awk '{print $2}')
           if [ -z "$DEV_SHA" ]; then
-            # If not a merge commit, use current commit
             DEV_SHA=${{ github.sha }}
           fi
           SHORT_DEV_SHA=$(echo $DEV_SHA | cut -c1-7)
@@ -94,7 +90,6 @@ jobs:
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           echo "Updating production environment with tag: prod-${SHORT_SHA}"
           
-          # Update prod values
           sed -i "s|tag:.*# backend|tag: prod-${SHORT_SHA} # backend|g" helm/openluffy/values/prod.yaml
           sed -i "s|tag:.*# frontend|tag: prod-${SHORT_SHA} # frontend|g" helm/openluffy/values/prod.yaml
           
@@ -107,20 +102,17 @@ jobs:
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           git commit -m "chore(prod): promote to prod-${SHORT_SHA} [skip ci]" || echo "No changes"
           
-          # Pull with rebase to handle concurrent pushes
           MAX_RETRIES=3
           RETRY_COUNT=0
           
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
             echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES..."
-            
             git fetch origin main
             
             if git rebase origin/main; then
               echo "Rebase successful"
               break
             else
-              echo "Rebase failed, trying to resolve..."
               git rebase --abort || true
               git reset --hard HEAD~1
               git pull origin main
@@ -143,25 +135,8 @@ jobs:
           
           git push
 
-  # Inject secrets into production ArgoCD Application
-  inject-secrets:
-    name: Inject Secrets to Production
-    runs-on: openluffy-runner
-    needs: [promote-images]
-    
-    steps:
-      - name: Install kubectl
+      - name: Inject secrets to production
         run: |
-          if ! command -v kubectl &> /dev/null; then
-            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/arm64/kubectl"
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/
-          fi
-          kubectl version --client
-          
-      - name: Update production ArgoCD Application with secrets
-        run: |
-          # Update openluffy-prod Application
           kubectl patch application openluffy-prod -n argocd --type merge --patch '
           spec:
             source:
@@ -172,30 +147,17 @@ jobs:
                   - name: secrets.githubToken
                     value: "${{ secrets.GH_PAT }}"
           '
-          echo "✅ Production application patched with secrets"
-          
-          # Note: ArgoCD sync policy determines if this deploys immediately or requires manual sync
-          # Check argocd/openluffy-prod.yaml for syncPolicy configuration
+          echo "✅ Production secrets injected"
 
-  # Summary
-  release-complete:
-    name: Production Release Complete
-    runs-on: ubuntu-latest
-    needs: [promote-images, inject-secrets]
-    steps:
       - name: Summary
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           echo "🏴‍☠️ OpenLuffy Production Release Complete"
           echo ""
-          echo "✅ Images promoted from dev-${{ needs.promote-images.outputs.dev_sha }} → prod-${SHORT_SHA}"
+          echo "✅ Images promoted from dev-${{ steps.find-dev-sha.outputs.dev_sha }} → prod-${SHORT_SHA}"
           echo "✅ Secrets injected to production"
           echo "✅ Production manifest updated"
           echo ""
           echo "Production: http://prod.openluffy.local"
           echo ""
-          echo "⚠️ Check ArgoCD sync status:"
-          echo "   http://argocd.local"
-          echo ""
-          echo "If manual sync is required:"
-          echo "   kubectl patch application openluffy-prod -n argocd -p '{\"operation\":{\"sync\":{}}}' --type merge"
+          echo "Check ArgoCD: http://argocd.local"

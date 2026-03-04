@@ -12,10 +12,10 @@ env:
   BUILD_PLATFORMS: linux/arm64  # Change to 'linux/amd64,linux/arm64' for multi-arch
 
 jobs:
-  # Build, scan, and push dev images
-  build-and-push:
-    name: Build & Push Dev Images
-    runs-on: ubuntu-latest
+  # Build, scan, push, and inject secrets - ALL IN ONE JOB
+  build-scan-deploy:
+    name: Build, Scan & Deploy to Dev/Preprod
+    runs-on: openluffy-runner
     if: github.event.pull_request.merged == true
     permissions:
       contents: write
@@ -104,7 +104,6 @@ jobs:
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           echo "Updating dev environment with tag: dev-${SHORT_SHA}"
           
-          # Update dev values
           sed -i "s|tag:.*# backend|tag: dev-${SHORT_SHA} # backend|g" helm/openluffy/values/dev.yaml
           sed -i "s|tag:.*# frontend|tag: dev-${SHORT_SHA} # frontend|g" helm/openluffy/values/dev.yaml
           
@@ -117,31 +116,21 @@ jobs:
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           git commit -m "chore(dev): update image tags to dev-${SHORT_SHA} [skip ci]" || echo "No changes"
           
-          # Pull with rebase to handle concurrent pushes - retry up to 3 times
           MAX_RETRIES=3
           RETRY_COUNT=0
           
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
             echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES..."
-            
-            # Fetch latest
             git fetch origin develop
             
-            # Try to rebase
             if git rebase origin/develop; then
               echo "Rebase successful"
               break
             else
-              echo "Rebase failed, trying to resolve..."
-              
-              # If rebase failed, abort and try a different approach
               git rebase --abort || true
+              git reset --hard HEAD~1
+              git pull origin develop
               
-              # Pull latest and re-apply our changes
-              git reset --hard HEAD~1  # Undo our commit
-              git pull origin develop  # Get latest
-              
-              # Re-apply changes
               sed -i "s|tag:.*# backend|tag: dev-${SHORT_SHA} # backend|g" helm/openluffy/values/dev.yaml
               sed -i "s|tag:.*# frontend|tag: dev-${SHORT_SHA} # frontend|g" helm/openluffy/values/dev.yaml
               
@@ -149,7 +138,7 @@ jobs:
               git commit -m "chore(dev): update image tags to dev-${SHORT_SHA} [skip ci]" || echo "No changes"
               
               RETRY_COUNT=$((RETRY_COUNT + 1))
-              sleep 2  # Brief pause before retry
+              sleep 2
             fi
           done
           
@@ -160,26 +149,8 @@ jobs:
           
           git push
 
-  # Inject secrets into ArgoCD Applications
-  inject-secrets:
-    name: Inject Secrets to ArgoCD
-    runs-on: openluffy-runner
-    needs: [build-and-push]
-    
-    steps:
-      - name: Install kubectl
+      - name: Inject secrets to dev environment
         run: |
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/arm64/kubectl"
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/
-          kubectl version --client
-          
-      - name: Update ArgoCD Applications with secret parameter
-        run: |
-          # Runner is in-cluster, use ServiceAccount credentials
-          export KUBECONFIG=/var/run/secrets/kubernetes.io/serviceaccount/kubeconfig || true
-          
-          # Update openluffy-dev Application
           kubectl patch application openluffy-dev -n argocd --type merge --patch '
           spec:
             source:
@@ -190,9 +161,10 @@ jobs:
                   - name: secrets.githubToken
                     value: "${{ secrets.GH_PAT }}"
           '
-          echo "✅ Dev application patched with secrets"
-          
-          # Update openluffy-preprod Application
+          echo "✅ Dev secrets injected"
+
+      - name: Inject secrets to preprod environment
+        run: |
           kubectl patch application openluffy-preprod -n argocd --type merge --patch '
           spec:
             source:
@@ -203,39 +175,25 @@ jobs:
                   - name: secrets.githubToken
                     value: "${{ secrets.GH_PAT }}"
           '
-          echo "✅ Preprod application patched with secrets"
-          
-          # Trigger ArgoCD sync
+          echo "✅ Preprod secrets injected"
+
+      - name: Trigger ArgoCD sync
+        run: |
           kubectl patch application openluffy-dev -n argocd -p '{"operation":{"sync":{}}}' --type merge || true
           kubectl patch application openluffy-preprod -n argocd -p '{"operation":{"sync":{}}}' --type merge || true
           echo "✅ ArgoCD sync triggered"
 
-  # Auto-promote to preprod after 30 seconds
-  promote-to-preprod:
-    name: Auto-Promote to Preprod
-    runs-on: ubuntu-latest
-    needs: [build-and-push, inject-secrets]
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          ref: develop
-
-      - name: Wait for dev deployment to stabilize
+      - name: Wait for dev deployment
         run: sleep 30
 
       - name: Promote to preprod
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          echo "Promoting dev-${SHORT_SHA} to preprod environment"
+          echo "Promoting dev-${SHORT_SHA} to preprod"
           
-          # Copy dev image tags to preprod
           sed -i "s|tag:.*# backend|tag: dev-${SHORT_SHA} # backend|g" helm/openluffy/values/preprod.yaml
           sed -i "s|tag:.*# frontend|tag: dev-${SHORT_SHA} # frontend|g" helm/openluffy/values/preprod.yaml
-          
+
       - name: Commit preprod manifest changes
         run: |
           git config --global user.name 'GitHub Actions'
@@ -245,31 +203,21 @@ jobs:
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           git commit -m "chore(preprod): auto-promote dev-${SHORT_SHA} [skip ci]" || echo "No changes"
           
-          # Pull with rebase to handle concurrent pushes - retry up to 3 times
           MAX_RETRIES=3
           RETRY_COUNT=0
           
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
             echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES..."
-            
-            # Fetch latest
             git fetch origin develop
             
-            # Try to rebase
             if git rebase origin/develop; then
               echo "Rebase successful"
               break
             else
-              echo "Rebase failed, trying to resolve..."
-              
-              # If rebase failed, abort and try a different approach
               git rebase --abort || true
+              git reset --hard HEAD~1
+              git pull origin develop
               
-              # Pull latest and re-apply our changes
-              git reset --hard HEAD~1  # Undo our commit
-              git pull origin develop  # Get latest
-              
-              # Re-apply changes
               sed -i "s|tag:.*# backend|tag: dev-${SHORT_SHA} # backend|g" helm/openluffy/values/preprod.yaml
               sed -i "s|tag:.*# frontend|tag: dev-${SHORT_SHA} # frontend|g" helm/openluffy/values/preprod.yaml
               
@@ -277,7 +225,7 @@ jobs:
               git commit -m "chore(preprod): auto-promote dev-${SHORT_SHA} [skip ci]" || echo "No changes"
               
               RETRY_COUNT=$((RETRY_COUNT + 1))
-              sleep 2  # Brief pause before retry
+              sleep 2
             fi
           done
           
@@ -288,18 +236,14 @@ jobs:
           
           git push
 
-  # Summary
-  release-complete:
-    name: Dev Release Complete
-    runs-on: ubuntu-latest
-    needs: [build-and-push, promote-to-preprod]
-    steps:
       - name: Summary
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           echo "🏴‍☠️ OpenLuffy Dev Release Complete"
           echo ""
           echo "✅ Images built: dev-${SHORT_SHA}"
+          echo "✅ Security scans passed"
+          echo "✅ Secrets injected to dev/preprod"
           echo "✅ Dev environment updated"
           echo "✅ Auto-promoted to preprod"
           echo ""
