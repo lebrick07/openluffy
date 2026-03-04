@@ -147,6 +147,10 @@ jobs:
                     value: "${{ secrets.GH_PAT }}"
           '
           echo "✅ Production secrets injected"
+          
+          # Trigger ArgoCD sync
+          kubectl patch application openluffy-prod -n argocd -p '{"operation":{"sync":{}}}' --type merge || true
+          echo "✅ ArgoCD sync triggered"
 
       - name: Summary
         run: |
