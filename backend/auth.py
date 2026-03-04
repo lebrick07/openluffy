@@ -37,7 +37,7 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    username: str
     password: str
 
 
@@ -239,24 +239,17 @@ async def login(
     db: Session = Depends(get_db)
 ):
     """
-    Login with email and password
+    Login with username and password
     """
-    # DEBUG: Log incoming request
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.warning(f"LOGIN ATTEMPT: email='{request_data.email}' password_len={len(request_data.password)} password_repr={repr(request_data.password)}")
-    
-    # Find user
-    user = db.query(User).filter(User.email == request_data.email).first()
+    # Find user by username
+    user = db.query(User).filter(User.username == request_data.username).first()
     if not user:
-        logger.warning(f"LOGIN FAILED: User not found for email '{request_data.email}'")
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="Invalid username or password")
     
     # Verify password
     password_valid = verify_password(request_data.password, user.password_hash)
     if not password_valid:
-        logger.warning(f"LOGIN FAILED: Invalid password for '{request_data.email}'. Password received: {repr(request_data.password[:5])}... (len={len(request_data.password)})")
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="Invalid username or password")
     
     # Check if user is active
     if not user.is_active:
@@ -655,40 +648,65 @@ async def resend_verification_email(
     return {"message": "Verification email sent"}
 
 
+class BootstrapRequest(BaseModel):
+    password: Optional[str] = None  # If not provided, will be auto-generated
+
+
 @router.post("/bootstrap/create-admin")
 async def bootstrap_create_admin(
-    request_data: RegisterRequest,
+    request_data: Optional[BootstrapRequest] = None,
     db: Session = Depends(get_db)
 ):
     """
     Bootstrap endpoint to create the first admin user
-    Only works if no admin users exist in the system
+    
+    This endpoint is ONLY available when the database is completely empty (no users exist).
+    Each deployment of OpenLuffy is independent - this endpoint must be called once per deployment.
+    
+    Creates an admin user with:
+    - Username: admin
+    - Email: admin@openluffy.local
+    - Password: randomly generated (returned in response) or provided in request
+    
+    After the first admin user is created, use /v1/auth/users to create additional users.
     """
-    # Check if any admin user already exists
-    existing_admin = db.query(User).filter(User.role == 'admin').first()
-    if existing_admin:
+    # Check if ANY users exist - bootstrap only works on empty database
+    user_count = db.query(User).count()
+    if user_count > 0:
         raise HTTPException(
             status_code=403, 
-            detail="Admin user already exists. Use normal registration for additional users."
+            detail="Bootstrap already complete. This instance has been initialized. Use /v1/auth/users to create additional users (admin access required)."
         )
     
-    # Validate password strength
-    is_valid, error = validate_password_strength(request_data.password)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=error)
+    # Generate or use provided password
+    if request_data and request_data.password:
+        password = request_data.password
+        # Validate password strength
+        is_valid, error = validate_password_strength(password)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=error)
+    else:
+        # Generate random strong password: 16 chars, alphanumeric + special
+        import string
+        chars = string.ascii_letters + string.digits + "!@#$%^&*"
+        password = ''.join(secrets.choice(chars) for _ in range(16))
     
-    # Check if email already exists
-    existing_user = db.query(User).filter(User.email == request_data.email).first()
+    # Create admin user with fixed credentials
+    admin_email = "admin@openluffy.local"
+    admin_username = "admin"
+    
+    # Check if email already exists (shouldn't happen, but safety check)
+    existing_user = db.query(User).filter(User.email == admin_email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
     # Create admin user
     admin_user = User(
-        email=request_data.email,
-        username=request_data.username or request_data.email.split('@')[0],
-        first_name=request_data.first_name or "Admin",
-        last_name=request_data.last_name or "User",
-        password_hash=hash_password(request_data.password),
+        email=admin_email,
+        username=admin_username,
+        first_name="Admin",
+        last_name="User",
+        password_hash=hash_password(password),
         role='admin',  # Admin role
         is_active=True,
         email_verified=True,  # Auto-verify bootstrap admin
@@ -704,7 +722,7 @@ async def bootstrap_create_admin(
         action="admin_user_bootstrapped",
         resource_type="user",
         resource_id=str(admin_user.id),
-        details={"email": admin_user.email, "role": "admin"}
+        details={"email": admin_user.email, "role": "admin", "username": admin_username}
     )
     db.add(audit)
     
@@ -713,6 +731,8 @@ async def bootstrap_create_admin(
     
     return {
         "message": "Admin user created successfully",
+        "username": admin_username,
+        "password": password,  # Return the password (only shown once!)
         "user": admin_user.to_dict()
     }
 

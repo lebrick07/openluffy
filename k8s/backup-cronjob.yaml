@@ -1,0 +1,91 @@
+---
+# Automated database backups - runs daily at 2 AM
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: openluffy-backup
+  namespace: kube-system
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: openluffy-backup
+          containers:
+          - name: backup
+            image: postgres:16-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              BACKUP_DIR="/backups"
+              
+              mkdir -p "$BACKUP_DIR"
+              
+              echo "🔄 Backing up databases..."
+              
+              # Install kubectl
+              apk add --no-cache curl
+              curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+              chmod +x kubectl
+              mv kubectl /usr/local/bin/
+              
+              # Backup each environment
+              for ENV in dev preprod prod; do
+                NS="openluffy-${ENV}"
+                if kubectl get namespace "$NS" >/dev/null 2>&1; then
+                  echo "Backing up $ENV..."
+                  POD=$(kubectl get pod -n "$NS" -l app=openluffy-${ENV}-postgres -o jsonpath='{.items[0].metadata.name}')
+                  kubectl exec -n "$NS" "$POD" -- pg_dump -U openluffy openluffy | gzip > "$BACKUP_DIR/${ENV}_${TIMESTAMP}.sql.gz"
+                fi
+              done
+              
+              # Cleanup old backups (keep 30 days)
+              find "$BACKUP_DIR" -name "*.sql.gz" -mtime +30 -delete
+              
+              echo "✅ Backups complete!"
+              ls -lh "$BACKUP_DIR"
+            volumeMounts:
+            - name: backups
+              mountPath: /backups
+          restartPolicy: OnFailure
+          volumes:
+          - name: backups
+            hostPath:
+              path: /mnt/openluffy-backups
+              type: DirectoryOrCreate
+---
+# ServiceAccount for backup job
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openluffy-backup
+  namespace: kube-system
+---
+# RBAC permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openluffy-backup
+rules:
+- apiGroups: [""]
+  resources: ["namespaces", "pods", "pods/exec"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openluffy-backup
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: openluffy-backup
+subjects:
+- kind: ServiceAccount
+  name: openluffy-backup
+  namespace: kube-system

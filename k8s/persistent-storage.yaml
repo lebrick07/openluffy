@@ -1,0 +1,13 @@
+---
+# StorageClass for persistent data that survives cluster rebuilds
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-persistent
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: rancher.io/local-path
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain  # Keep data even when PVC is deleted
+parameters:
+  nodePath: /mnt/openluffy-data  # Persistent location

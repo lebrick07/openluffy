@@ -10,20 +10,37 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # Build and push production images
-  build-and-push:
-    name: Build & Push Production Images
+  # Promote tested dev images to production
+  promote-images:
+    name: Promote Dev Images to Production
     runs-on: ubuntu-latest
     permissions:
       contents: write
       packages: write
+    outputs:
+      dev_sha: ${{ steps.find-dev-sha.outputs.dev_sha }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history to find merge base
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Find dev SHA that was merged
+        id: find-dev-sha
+        run: |
+          # Get the merge base (last commit from develop)
+          DEV_SHA=$(git log --merges -1 --pretty=format:%P | awk '{print $1}')
+          if [ -z "$DEV_SHA" ]; then
+            # If not a merge commit, use current commit
+            DEV_SHA=${{ github.sha }}
+          fi
+          SHORT_DEV_SHA=$(echo $DEV_SHA | cut -c1-7)
+          SHORT_MAIN_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          
+          echo "dev_sha=$SHORT_DEV_SHA" >> $GITHUB_OUTPUT
+          echo "main_sha=$SHORT_MAIN_SHA" >> $GITHUB_OUTPUT
+          echo "📦 Promoting dev-${SHORT_DEV_SHA} → prod-${SHORT_MAIN_SHA}"
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -32,56 +49,52 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (backend)
-        id: meta-backend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
-          tags: |
-            type=sha,prefix=main-
-            type=raw,value=latest
+      - name: Promote backend image
+        run: |
+          DEV_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:dev-${{ steps.find-dev-sha.outputs.dev_sha }}"
+          PROD_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:prod-${{ steps.find-dev-sha.outputs.main_sha }}"
+          LATEST_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest"
+          
+          echo "Pulling tested image: $DEV_TAG"
+          docker pull $DEV_TAG
+          
+          echo "Tagging as: $PROD_TAG"
+          docker tag $DEV_TAG $PROD_TAG
+          docker tag $DEV_TAG $LATEST_TAG
+          
+          echo "Pushing production tags"
+          docker push $PROD_TAG
+          docker push $LATEST_TAG
+          
+          echo "✅ Backend promoted: dev-${{ steps.find-dev-sha.outputs.dev_sha }} → prod-${{ steps.find-dev-sha.outputs.main_sha }}"
 
-      - name: Build and push backend (multi-arch)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./backend/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta-backend.outputs.tags }}
-          labels: ${{ steps.meta-backend.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Extract metadata (frontend)
-        id: meta-frontend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend
-          tags: |
-            type=sha,prefix=main-
-            type=raw,value=latest
-
-      - name: Build and push frontend (multi-arch)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./openluffy-ui/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta-frontend.outputs.tags }}
-          labels: ${{ steps.meta-frontend.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Promote frontend image
+        run: |
+          DEV_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:dev-${{ steps.find-dev-sha.outputs.dev_sha }}"
+          PROD_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:prod-${{ steps.find-dev-sha.outputs.main_sha }}"
+          LATEST_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest"
+          
+          echo "Pulling tested image: $DEV_TAG"
+          docker pull $DEV_TAG
+          
+          echo "Tagging as: $PROD_TAG"
+          docker tag $DEV_TAG $PROD_TAG
+          docker tag $DEV_TAG $LATEST_TAG
+          
+          echo "Pushing production tags"
+          docker push $PROD_TAG
+          docker push $LATEST_TAG
+          
+          echo "✅ Frontend promoted: dev-${{ steps.find-dev-sha.outputs.dev_sha }} → prod-${{ steps.find-dev-sha.outputs.main_sha }}"
 
       - name: Update production manifests
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          echo "Updating production environment with tag: main-${SHORT_SHA}"
+          echo "Updating production environment with tag: prod-${SHORT_SHA}"
           
           # Update prod values
-          sed -i "s|tag:.*# backend|tag: main-${SHORT_SHA} # backend|g" helm/openluffy/values/prod.yaml
-          sed -i "s|tag:.*# frontend|tag: main-${SHORT_SHA} # frontend|g" helm/openluffy/values/prod.yaml
+          sed -i "s|tag:.*# backend|tag: prod-${SHORT_SHA} # backend|g" helm/openluffy/values/prod.yaml
+          sed -i "s|tag:.*# frontend|tag: prod-${SHORT_SHA} # frontend|g" helm/openluffy/values/prod.yaml
           
       - name: Commit production manifest changes
         run: |
@@ -90,20 +103,64 @@ jobs:
           git add helm/openluffy/values/prod.yaml
           
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          git commit -m "chore(prod): update image tags to main-${SHORT_SHA} [skip ci]" || echo "No changes"
+          git commit -m "chore(prod): promote to prod-${SHORT_SHA} [skip ci]" || echo "No changes"
+          
+          # Pull with rebase to handle concurrent pushes
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES..."
+            
+            git fetch origin main
+            
+            if git rebase origin/main; then
+              echo "Rebase successful"
+              break
+            else
+              echo "Rebase failed, trying to resolve..."
+              git rebase --abort || true
+              git reset --hard HEAD~1
+              git pull origin main
+              
+              sed -i "s|tag:.*# backend|tag: prod-${SHORT_SHA} # backend|g" helm/openluffy/values/prod.yaml
+              sed -i "s|tag:.*# frontend|tag: prod-${SHORT_SHA} # frontend|g" helm/openluffy/values/prod.yaml
+              
+              git add helm/openluffy/values/prod.yaml
+              git commit -m "chore(prod): promote to prod-${SHORT_SHA} [skip ci]" || echo "No changes"
+              
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              sleep 2
+            fi
+          done
+          
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "Failed to rebase after $MAX_RETRIES attempts"
+            exit 1
+          fi
+          
           git push
 
-  # Inject secrets into ArgoCD Application
+  # Inject secrets into production ArgoCD Application
   inject-secrets:
-    name: Inject Secrets to ArgoCD
-    runs-on: self-hosted
-    needs: [build-and-push]
+    name: Inject Secrets to Production
+    runs-on: openluffy-runner
+    needs: [promote-images]
     
     steps:
-      - name: Update ArgoCD Application with secret parameters
+      - name: Install kubectl
+        run: |
+          if ! command -v kubectl &> /dev/null; then
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/arm64/kubectl"
+            chmod +x kubectl
+            sudo mv kubectl /usr/local/bin/
+          fi
+          kubectl version --client
+          
+      - name: Update production ArgoCD Application with secrets
         run: |
           # Update openluffy-prod Application
-          cat > /tmp/prod-patch.yaml << 'EOF'
+          kubectl patch application openluffy-prod -n argocd --type merge --patch '
           spec:
             source:
               helm:
@@ -112,28 +169,31 @@ jobs:
                     value: "${{ secrets.ANTHROPIC_API_KEY }}"
                   - name: secrets.githubToken
                     value: "${{ secrets.GH_PAT }}"
-          EOF
+          '
+          echo "✅ Production application patched with secrets"
           
-          kubectl patch application openluffy-prod -n argocd --type merge --patch-file /tmp/prod-patch.yaml
-          echo "✅ Prod application patched with secrets"
-          
-          # Trigger ArgoCD sync
-          kubectl patch application openluffy-prod -n argocd -p '{"operation":{"sync":{}}}' --type merge
-          echo "✅ ArgoCD sync triggered"
+          # Note: ArgoCD sync policy determines if this deploys immediately or requires manual sync
+          # Check argocd/openluffy-prod.yaml for syncPolicy configuration
 
-  # Production deployment complete
+  # Summary
   release-complete:
     name: Production Release Complete
     runs-on: ubuntu-latest
-    needs: [build-and-push, inject-secrets]
+    needs: [promote-images, inject-secrets]
     steps:
       - name: Summary
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           echo "🏴‍☠️ OpenLuffy Production Release Complete"
           echo ""
-          echo "✅ Production images built: main-${SHORT_SHA}"
-          echo "✅ Production manifests updated"
-          echo "✅ ArgoCD will sync automatically"
+          echo "✅ Images promoted from dev-${{ needs.promote-images.outputs.dev_sha }} → prod-${SHORT_SHA}"
+          echo "✅ Secrets injected to production"
+          echo "✅ Production manifest updated"
           echo ""
-          echo "Production: http://openluffy.local"
+          echo "Production: http://prod.openluffy.local"
+          echo ""
+          echo "⚠️ Check ArgoCD sync status:"
+          echo "   http://argocd.local"
+          echo ""
+          echo "If manual sync is required:"
+          echo "   kubectl patch application openluffy-prod -n argocd -p '{\"operation\":{\"sync\":{}}}' --type merge"

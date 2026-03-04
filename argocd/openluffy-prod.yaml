@@ -16,7 +16,9 @@ spec:
     server: https://kubernetes.default.svc
     namespace: openluffy-prod
   syncPolicy:
-    # Manual sync only for production - requires approval
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=true
     retry:
