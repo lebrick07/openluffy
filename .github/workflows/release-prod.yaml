@@ -29,8 +29,8 @@ jobs:
       - name: Find dev SHA that was merged
         id: find-dev-sha
         run: |
-          # Get the merge base (last commit from develop)
-          DEV_SHA=$(git log --merges -1 --pretty=format:%P | awk '{print $1}')
+          # Get the second parent of merge commit (the develop branch HEAD)
+          DEV_SHA=$(git log --merges -1 --pretty=format:%P | awk '{print $2}')
           if [ -z "$DEV_SHA" ]; then
             # If not a merge commit, use current commit
             DEV_SHA=${{ github.sha }}
