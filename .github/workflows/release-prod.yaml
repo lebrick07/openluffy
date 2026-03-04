@@ -1,8 +1,9 @@
 name: Release - Production
 
-# Runs ONLY on merge to main - production deployment
+# Runs ONLY on PR merge to main - production deployment
 on:
-  push:
+  pull_request:
+    types: [closed]
     branches: [main]
 
 env:
@@ -14,6 +15,7 @@ jobs:
   promote-images:
     name: Promote Dev Images to Production
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
     permissions:
       contents: write
       packages: write
