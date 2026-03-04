@@ -48,3 +48,8 @@ git push origin feature/your-feature
 https://github.com/lebrick07/openluffy
 
 <!-- CI/CD Pipeline Test - 2026-02-15 -->
+
+
+## Pipeline Testing
+
+This commit tests the new unified pipeline architecture with visible stages.
