@@ -90,11 +90,6 @@ jobs:
     needs: [code-quality-backend]
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker
 
       - name: Build backend image
         uses: docker/build-push-action@v5
@@ -129,11 +124,6 @@ jobs:
     needs: [code-quality-frontend]
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker
 
       - name: Build frontend image
         uses: docker/build-push-action@v5
