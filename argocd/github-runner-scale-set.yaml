@@ -18,6 +18,19 @@ spec:
           value: ""  # Pre-created secret: github-runner-token in arc-runners namespace
         - name: githubConfigSecret
           value: "github-runner-token"
+      valuesObject:
+        template:
+          spec:
+            containers:
+              - name: runner
+                volumeMounts:
+                  - name: docker-socket
+                    mountPath: /var/run/docker.sock
+            volumes:
+              - name: docker-socket
+                hostPath:
+                  path: /var/run/docker.sock
+                  type: Socket
   destination:
     server: https://kubernetes.default.svc
     namespace: arc-runners
