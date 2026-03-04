@@ -15,7 +15,7 @@ jobs:
   promote-images:
     name: Promote Dev Images to Production
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
     permissions:
       contents: write
       packages: write
