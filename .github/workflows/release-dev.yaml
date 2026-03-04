@@ -1,8 +1,9 @@
 name: Release - Dev
 
-# Runs on merge to develop branch
+# Runs on PR merge to develop branch
 on:
-  push:
+  pull_request:
+    types: [closed]
     branches: [develop]
 
 env:
@@ -15,6 +16,7 @@ jobs:
   build-and-push:
     name: Build & Push Dev Images
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
     permissions:
       contents: write
       packages: write
