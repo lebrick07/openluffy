@@ -11,7 +11,7 @@ env:
   BUILD_PLATFORMS: linux/arm64  # Change to 'linux/amd64,linux/arm64' for multi-arch
 
 jobs:
-  # Build and push dev images
+  # Build, scan, and push dev images
   build-and-push:
     name: Build & Push Dev Images
     runs-on: ubuntu-latest
@@ -42,7 +42,7 @@ jobs:
             type=sha,prefix=dev-
             type=raw,value=dev-latest
 
-      - name: Build and push backend (multi-arch)
+      - name: Build and push backend
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -63,7 +63,7 @@ jobs:
             type=sha,prefix=dev-
             type=raw,value=dev-latest
 
-      - name: Build and push frontend (multi-arch)
+      - name: Build and push frontend
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -74,6 +74,28 @@ jobs:
           labels: ${{ steps.meta-frontend.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner (backend)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:dev-${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-backend-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Run Trivy vulnerability scanner (frontend)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:dev-${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-frontend-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: '.'
 
       - name: Update dev manifests
         run: |
