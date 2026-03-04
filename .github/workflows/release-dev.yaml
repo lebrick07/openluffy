@@ -14,7 +14,7 @@ jobs:
   # Stage 1: Build Backend
   build-backend:
     name: Build Backend
-    runs-on: openluffy-runner
+    runs-on: ubuntu-latest
     if: github.event.pull_request.merged == true
     permissions:
       packages: write
@@ -47,7 +47,7 @@ jobs:
   # Stage 2: Scan Backend
   scan-backend:
     name: Scan Backend
-    runs-on: openluffy-runner
+    runs-on: ubuntu-latest
     needs: [build-backend]
     steps:
       - name: Run Trivy scan
@@ -67,7 +67,7 @@ jobs:
   # Stage 3: Build Frontend
   build-frontend:
     name: Build Frontend
-    runs-on: openluffy-runner
+    runs-on: ubuntu-latest
     if: github.event.pull_request.merged == true
     permissions:
       packages: write
@@ -100,7 +100,7 @@ jobs:
   # Stage 4: Scan Frontend
   scan-frontend:
     name: Scan Frontend
-    runs-on: openluffy-runner
+    runs-on: ubuntu-latest
     needs: [build-frontend]
     steps:
       - name: Run Trivy scan
