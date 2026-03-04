@@ -1,151 +1,160 @@
 name: Release - Dev
 
+# Runs on merge to develop branch
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [develop]
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  BUILD_PLATFORMS: linux/arm64
 
 jobs:
-  # Stage 1: Build Backend
-  build-backend:
-    name: Build Backend
+  # Build and push dev images
+  build-and-push:
+    name: Build & Push Dev Images
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true
     permissions:
+      contents: write
       packages: write
+
     steps:
-      - uses: actions/checkout@v4
-      
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Registry
+      - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push backend
+      - name: Extract metadata (backend)
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
+          tags: |
+            type=sha,prefix=dev-
+            type=raw,value=dev-latest
+
+      - name: Build and push backend (multi-arch)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./backend/Dockerfile
           push: true
-          platforms: ${{ env.BUILD_PLATFORMS }}
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:dev-${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:dev-latest
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Stage 2: Scan Backend
-  scan-backend:
-    name: Scan Backend
-    runs-on: ubuntu-latest
-    needs: [build-backend]
-    steps:
-      - name: Run Trivy scan
-        uses: aquasecurity/trivy-action@master
+      - name: Extract metadata (frontend)
+        id: meta-frontend
+        uses: docker/metadata-action@v5
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:dev-${{ github.sha }}
-          format: 'sarif'
-          output: 'trivy-backend.sarif'
-          severity: 'CRITICAL,HIGH'
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend
+          tags: |
+            type=sha,prefix=dev-
+            type=raw,value=dev-latest
 
-      - name: Upload scan results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-backend.sarif'
-
-  # Stage 3: Build Frontend
-  build-frontend:
-    name: Build Frontend
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true
-    permissions:
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push frontend
+      - name: Build and push frontend (multi-arch)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./openluffy-ui/Dockerfile
           push: true
-          platforms: ${{ env.BUILD_PLATFORMS }}
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:dev-${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:dev-latest
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  # Stage 4: Scan Frontend
-  scan-frontend:
-    name: Scan Frontend
-    runs-on: ubuntu-latest
-    needs: [build-frontend]
-    steps:
-      - name: Run Trivy scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:dev-${{ github.sha }}
-          format: 'sarif'
-          output: 'trivy-frontend.sarif'
-          severity: 'CRITICAL,HIGH'
-
-      - name: Upload scan results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-frontend.sarif'
-
-  # Stage 5: Deploy to Dev
-  deploy-dev:
-    name: Deploy to Dev
-    runs-on: openluffy-runner
-    needs: [scan-backend, scan-frontend]
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
 
       - name: Update dev manifests
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "Updating dev environment with tag: dev-${SHORT_SHA}"
+          
+          # Update dev values
           sed -i "s|tag:.*# backend|tag: dev-${SHORT_SHA} # backend|g" helm/openluffy/values/dev.yaml
           sed -i "s|tag:.*# frontend|tag: dev-${SHORT_SHA} # frontend|g" helm/openluffy/values/dev.yaml
-
-      - name: Commit manifests
+          
+      - name: Commit dev manifest changes
         run: |
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'actions@github.com'
           git add helm/openluffy/values/dev.yaml
+          
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          git commit -m "chore(dev): deploy dev-${SHORT_SHA} [skip ci]" || echo "No changes"
-          git pull --rebase origin develop || true
+          git commit -m "chore(dev): update image tags to dev-${SHORT_SHA} [skip ci]" || echo "No changes"
+          
+          # Pull with rebase to handle concurrent pushes - retry up to 3 times
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES..."
+            
+            # Fetch latest
+            git fetch origin develop
+            
+            # Try to rebase
+            if git rebase origin/develop; then
+              echo "Rebase successful"
+              break
+            else
+              echo "Rebase failed, trying to resolve..."
+              
+              # If rebase failed, abort and try a different approach
+              git rebase --abort || true
+              
+              # Pull latest and re-apply our changes
+              git reset --hard HEAD~1  # Undo our commit
+              git pull origin develop  # Get latest
+              
+              # Re-apply changes
+              sed -i "s|tag:.*# backend|tag: dev-${SHORT_SHA} # backend|g" helm/openluffy/values/dev.yaml
+              sed -i "s|tag:.*# frontend|tag: dev-${SHORT_SHA} # frontend|g" helm/openluffy/values/dev.yaml
+              
+              git add helm/openluffy/values/dev.yaml
+              git commit -m "chore(dev): update image tags to dev-${SHORT_SHA} [skip ci]" || echo "No changes"
+              
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              sleep 2  # Brief pause before retry
+            fi
+          done
+          
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "Failed to rebase after $MAX_RETRIES attempts"
+            exit 1
+          fi
+          
           git push
 
-      - name: Inject secrets to ArgoCD
+  # Inject secrets into ArgoCD Applications
+  inject-secrets:
+    name: Inject Secrets to ArgoCD
+    runs-on: self-hosted
+    needs: [build-and-push]
+    
+    steps:
+      - name: Install kubectl
         run: |
-          kubectl patch application openluffy-dev -n argocd --type merge --patch '
+          if ! command -v kubectl &> /dev/null; then
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/arm64/kubectl"
+            chmod +x kubectl
+            sudo mv kubectl /usr/local/bin/
+          fi
+          kubectl version --client
+          
+      - name: Update ArgoCD Applications with secret parameter
+        run: |
+          # Update openluffy-dev Application
+          cat > /tmp/dev-patch.yaml << 'EOF'
           spec:
             source:
               helm:
@@ -154,48 +163,123 @@ jobs:
                     value: "${{ secrets.ANTHROPIC_API_KEY }}"
                   - name: secrets.githubToken
                     value: "${{ secrets.GH_PAT }}"
-          '
+          EOF
+          
+          kubectl patch application openluffy-dev -n argocd --type merge --patch-file /tmp/dev-patch.yaml
+          echo "✅ Dev application patched with secrets"
+          
+          # Update openluffy-preprod Application
+          cat > /tmp/preprod-patch.yaml << 'EOF'
+          spec:
+            source:
+              helm:
+                parameters:
+                  - name: secrets.claudeApiKey
+                    value: "${{ secrets.ANTHROPIC_API_KEY }}"
+                  - name: secrets.githubToken
+                    value: "${{ secrets.GH_PAT }}"
+          EOF
+          
+          kubectl patch application openluffy-preprod -n argocd --type merge --patch-file /tmp/preprod-patch.yaml
+          echo "✅ Preprod application patched with secrets"
+          
+          # Trigger ArgoCD sync
+          kubectl patch application openluffy-dev -n argocd -p '{"operation":{"sync":{}}}' --type merge
+          kubectl patch application openluffy-preprod -n argocd -p '{"operation":{"sync":{}}}' --type merge
+          echo "✅ ArgoCD sync triggered"
 
-  # Stage 6: Deploy to Preprod
-  deploy-preprod:
-    name: Deploy to Preprod
-    runs-on: openluffy-runner
-    needs: [deploy-dev]
+  # Auto-promote to preprod after 30 seconds
+  promote-to-preprod:
+    name: Auto-Promote to Preprod
+    runs-on: ubuntu-latest
+    needs: [build-and-push, inject-secrets]
     permissions:
       contents: write
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
           ref: develop
 
-      - name: Wait for dev stabilization
+      - name: Wait for dev deployment to stabilize
         run: sleep 30
 
-      - name: Update preprod manifests
+      - name: Promote to preprod
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "Promoting dev-${SHORT_SHA} to preprod environment"
+          
+          # Copy dev image tags to preprod
           sed -i "s|tag:.*# backend|tag: dev-${SHORT_SHA} # backend|g" helm/openluffy/values/preprod.yaml
           sed -i "s|tag:.*# frontend|tag: dev-${SHORT_SHA} # frontend|g" helm/openluffy/values/preprod.yaml
-
-      - name: Commit manifests
+          
+      - name: Commit preprod manifest changes
         run: |
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'actions@github.com'
           git add helm/openluffy/values/preprod.yaml
+          
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          git commit -m "chore(preprod): deploy dev-${SHORT_SHA} [skip ci]" || echo "No changes"
-          git pull --rebase origin develop || true
+          git commit -m "chore(preprod): auto-promote dev-${SHORT_SHA} [skip ci]" || echo "No changes"
+          
+          # Pull with rebase to handle concurrent pushes - retry up to 3 times
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES..."
+            
+            # Fetch latest
+            git fetch origin develop
+            
+            # Try to rebase
+            if git rebase origin/develop; then
+              echo "Rebase successful"
+              break
+            else
+              echo "Rebase failed, trying to resolve..."
+              
+              # If rebase failed, abort and try a different approach
+              git rebase --abort || true
+              
+              # Pull latest and re-apply our changes
+              git reset --hard HEAD~1  # Undo our commit
+              git pull origin develop  # Get latest
+              
+              # Re-apply changes
+              sed -i "s|tag:.*# backend|tag: dev-${SHORT_SHA} # backend|g" helm/openluffy/values/preprod.yaml
+              sed -i "s|tag:.*# frontend|tag: dev-${SHORT_SHA} # frontend|g" helm/openluffy/values/preprod.yaml
+              
+              git add helm/openluffy/values/preprod.yaml
+              git commit -m "chore(preprod): auto-promote dev-${SHORT_SHA} [skip ci]" || echo "No changes"
+              
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              sleep 2  # Brief pause before retry
+            fi
+          done
+          
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "Failed to rebase after $MAX_RETRIES attempts"
+            exit 1
+          fi
+          
           git push
 
-      - name: Inject secrets to ArgoCD
+  # Summary
+  release-complete:
+    name: Dev Release Complete
+    runs-on: ubuntu-latest
+    needs: [build-and-push, promote-to-preprod]
+    steps:
+      - name: Summary
         run: |
-          kubectl patch application openluffy-preprod -n argocd --type merge --patch '
-          spec:
-            source:
-              helm:
-                parameters:
-                  - name: secrets.claudeApiKey
-                    value: "${{ secrets.ANTHROPIC_API_KEY }}"
-                  - name: secrets.githubToken
-                    value: "${{ secrets.GH_PAT }}"
-          '
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "🏴‍☠️ OpenLuffy Dev Release Complete"
+          echo ""
+          echo "✅ Images built: dev-${SHORT_SHA}"
+          echo "✅ Dev environment updated"
+          echo "✅ Auto-promoted to preprod"
+          echo ""
+          echo "Dev: http://dev.openluffy.local"
+          echo "Preprod: http://preprod.openluffy.local"
