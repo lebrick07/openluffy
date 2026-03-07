@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: github-runner-scale-set
+  namespace: argocd
+spec:
+  project: default
+  source:
+    chart: gha-runner-scale-set
+    repoURL: ghcr.io/actions/actions-runner-controller-charts
+    targetRevision: 0.13.1
+    helm:
+      releaseName: openluffy-runner
+      parameters:
+        - name: githubConfigUrl
+          value: "https://github.com/lebrick07/openluffy"
+        - name: githubConfigSecret.github_token
+          value: ""  # Pre-created secret: github-runner-token in arc-runners namespace
+        - name: githubConfigSecret
+          value: "github-runner-token"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: arc-runners
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

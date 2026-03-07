@@ -59,11 +59,22 @@ secrets:
   # - helm install --set secrets.claudeApiKey=$ANTHROPIC_API_KEY
   # - or ArgoCD Application parameters (injected by workflow)
   # DO NOT commit actual secret values to git
+  # Optional: If not set, AI features will be disabled gracefully
   claudeApiKey: ""
   
   # githubToken should be set via:
   # - helm install --set secrets.githubToken=$GITHUB_TOKEN
   # - or ArgoCD Application parameters (injected by workflow)
   # DO NOT commit actual secret values to git
+  # Optional: Required for GitHub repository operations
   githubToken: ""
+  
+  # githubWebhookSecret for validating GitHub webhook payloads
+  # Optional: Set if using GitHub webhooks
+  githubWebhookSecret: ""
+  
+  # openaiApiKey as alternative to Claude
+  # Optional: If not set, will fall back to Claude or disable AI features
+  openaiApiKey: ""
+  
   githubOrg: "lebrick07"  # Default GitHub organization

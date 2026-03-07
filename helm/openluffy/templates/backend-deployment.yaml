@@ -60,7 +60,7 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-api-keys
                   key: claude-api-key
-                  optional: false
+                  optional: true
             - name: GITHUB_TOKEN
               valueFrom:
                 secretKeyRef:

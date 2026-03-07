@@ -1,109 +1,179 @@
 name: Release - Production
 
-# Runs ONLY on merge to main - production deployment
 on:
-  push:
+  pull_request:
+    types: [closed]
     branches: [main]
+  workflow_dispatch:  # Allow manual triggers
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # Build and push production images
-  build-and-push:
-    name: Build & Push Production Images
-    runs-on: ubuntu-latest
+  # Stage 1: Promote Backend
+  promote-backend:
+    name: Promote Backend
+    runs-on: openluffy-runner
+    # Only run on PR merges from develop branch OR manual workflow_dispatch
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop') ||
+      (github.event_name == 'workflow_dispatch')
     permissions:
-      contents: write
       packages: write
-
+    outputs:
+      dev_sha: ${{ steps.find-sha.outputs.dev_sha }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Find dev SHA
+        id: find-sha
+        run: |
+          DEV_SHA=$(git log --merges -1 --pretty=format:%P | awk '{print $2}')
+          [ -z "$DEV_SHA" ] && DEV_SHA=${{ github.sha }}
+          SHORT_DEV_SHA=$(echo $DEV_SHA | cut -c1-7)
+          SHORT_MAIN_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "dev_sha=$SHORT_DEV_SHA" >> $GITHUB_OUTPUT
+          echo "main_sha=$SHORT_MAIN_SHA" >> $GITHUB_OUTPUT
 
-      - name: Log in to Container Registry
+      - name: Log in to Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (backend)
-        id: meta-backend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
-          tags: |
-            type=sha,prefix=main-
-            type=raw,value=latest
+      - name: Promote backend image
+        run: |
+          DEV_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:dev-${{ steps.find-sha.outputs.dev_sha }}"
+          PROD_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:prod-${{ steps.find-sha.outputs.main_sha }}"
+          LATEST_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest"
+          
+          docker pull $DEV_TAG
+          docker tag $DEV_TAG $PROD_TAG
+          docker tag $DEV_TAG $LATEST_TAG
+          docker push $PROD_TAG
+          docker push $LATEST_TAG
 
-      - name: Build and push backend (multi-arch)
-        uses: docker/build-push-action@v5
+  # Stage 2: Scan Backend
+  scan-backend:
+    name: Scan Backend
+    runs-on: openluffy-runner
+    needs: [promote-backend]
+    steps:
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@master
         with:
-          context: .
-          file: ./backend/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta-backend.outputs.tags }}
-          labels: ${{ steps.meta-backend.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:prod-${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-backend.sarif'
+          severity: 'CRITICAL,HIGH'
 
-      - name: Extract metadata (frontend)
-        id: meta-frontend
-        uses: docker/metadata-action@v5
+      - name: Upload scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend
-          tags: |
-            type=sha,prefix=main-
-            type=raw,value=latest
+          sarif_file: 'trivy-backend.sarif'
 
-      - name: Build and push frontend (multi-arch)
-        uses: docker/build-push-action@v5
+  # Stage 3: Promote Frontend
+  promote-frontend:
+    name: Promote Frontend
+    runs-on: openluffy-runner
+    needs: [promote-backend]
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
         with:
-          context: .
-          file: ./openluffy-ui/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta-frontend.outputs.tags }}
-          labels: ${{ steps.meta-frontend.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          fetch-depth: 0
 
-      - name: Update production manifests
+      - name: Find dev SHA
+        id: find-sha
+        run: |
+          DEV_SHA=$(git log --merges -1 --pretty=format:%P | awk '{print $2}')
+          [ -z "$DEV_SHA" ] && DEV_SHA=${{ github.sha }}
+          SHORT_DEV_SHA=$(echo $DEV_SHA | cut -c1-7)
+          SHORT_MAIN_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "dev_sha=$SHORT_DEV_SHA" >> $GITHUB_OUTPUT
+          echo "main_sha=$SHORT_MAIN_SHA" >> $GITHUB_OUTPUT
+
+      - name: Log in to Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote frontend image
+        run: |
+          DEV_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:dev-${{ steps.find-sha.outputs.dev_sha }}"
+          PROD_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:prod-${{ steps.find-sha.outputs.main_sha }}"
+          LATEST_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest"
+          
+          docker pull $DEV_TAG
+          docker tag $DEV_TAG $PROD_TAG
+          docker tag $DEV_TAG $LATEST_TAG
+          docker push $PROD_TAG
+          docker push $LATEST_TAG
+
+  # Stage 4: Scan Frontend
+  scan-frontend:
+    name: Scan Frontend
+    runs-on: openluffy-runner
+    needs: [promote-frontend]
+    steps:
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:prod-${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-frontend.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-frontend.sarif'
+
+  # Stage 5: Deploy to Production
+  deploy-prod:
+    name: Deploy to Production
+    runs-on: openluffy-runner
+    needs: [scan-backend, scan-frontend]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update prod manifests
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          echo "Updating production environment with tag: main-${SHORT_SHA}"
-          
-          # Update prod values
-          sed -i "s|tag:.*# backend|tag: main-${SHORT_SHA} # backend|g" helm/openluffy/values/prod.yaml
-          sed -i "s|tag:.*# frontend|tag: main-${SHORT_SHA} # frontend|g" helm/openluffy/values/prod.yaml
-          
-      - name: Commit production manifest changes
+          sed -i "s|tag:.*# backend|tag: prod-${SHORT_SHA} # backend|g" helm/openluffy/values/prod.yaml
+          sed -i "s|tag:.*# frontend|tag: prod-${SHORT_SHA} # frontend|g" helm/openluffy/values/prod.yaml
+
+      - name: Commit manifests
         run: |
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'actions@github.com'
           git add helm/openluffy/values/prod.yaml
-          
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          git commit -m "chore(prod): update image tags to main-${SHORT_SHA} [skip ci]" || echo "No changes"
+          git commit -m "chore(prod): deploy prod-${SHORT_SHA} [skip ci]" || echo "No changes"
+          git pull --rebase origin main || true
           git push
 
   # Inject secrets into ArgoCD Application
   inject-secrets:
     name: Inject Secrets to ArgoCD
     runs-on: openluffy-runner
-    needs: [build-and-push]
+    needs: [deploy-prod]
     
     steps:
       - name: Update ArgoCD Application with secret parameters
         run: |
-          # Update openluffy-prod Application
-          cat > /tmp/prod-patch.yaml << 'EOF'
+          kubectl patch application openluffy-prod -n argocd --type merge --patch '
           spec:
             source:
               helm:
@@ -112,28 +182,4 @@ jobs:
                     value: "${{ secrets.ANTHROPIC_API_KEY }}"
                   - name: secrets.githubToken
                     value: "${{ secrets.GH_PAT }}"
-          EOF
-          
-          kubectl patch application openluffy-prod -n argocd --type merge --patch-file /tmp/prod-patch.yaml
-          echo "✅ Prod application patched with secrets"
-          
-          # Trigger ArgoCD sync
-          kubectl patch application openluffy-prod -n argocd -p '{"operation":{"sync":{}}}' --type merge
-          echo "✅ ArgoCD sync triggered"
-
-  # Production deployment complete
-  release-complete:
-    name: Production Release Complete
-    runs-on: ubuntu-latest
-    needs: [build-and-push, inject-secrets]
-    steps:
-      - name: Summary
-        run: |
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          echo "🏴‍☠️ OpenLuffy Production Release Complete"
-          echo ""
-          echo "✅ Production images built: main-${SHORT_SHA}"
-          echo "✅ Production manifests updated"
-          echo "✅ ArgoCD will sync automatically"
-          echo ""
-          echo "Production: http://openluffy.local"
+          '
