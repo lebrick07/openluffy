@@ -37,73 +37,75 @@
   flex-wrap: wrap;
 }
 
-.env-badge {
+/* Scope env-badge to detail page only */
+.app-detail-page .env-badge {
   padding: 0.25rem 0.75rem;
   border-radius: 6px;
   font-size: 0.875rem;
   font-weight: 600;
 }
 
-.env-dev {
+.app-detail-page .env-dev {
   background: #dbeafe;
   color: #1e40af;
 }
 
-.env-preprod {
+.app-detail-page .env-preprod {
   background: #fef3c7;
   color: #92400e;
 }
 
-.env-prod {
+.app-detail-page .env-prod {
   background: #fecaca;
   color: #991b1b;
 }
 
-.health-badge {
+/* Scope health and sync badges to detail page only */
+.app-detail-page .health-badge {
   padding: 0.25rem 0.75rem;
   border-radius: 6px;
   font-size: 0.875rem;
   font-weight: 600;
 }
 
-.health-healthy {
+.app-detail-page .health-healthy {
   background: #d1fae5;
   color: #065f46;
 }
 
-.health-degraded {
+.app-detail-page .health-degraded {
   background: #fed7aa;
   color: #9a3412;
 }
 
-.health-progressing {
+.app-detail-page .health-progressing {
   background: #dbeafe;
   color: #1e40af;
 }
 
-.health-unknown {
+.app-detail-page .health-unknown {
   background: #e5e7eb;
   color: #4b5563;
 }
 
-.sync-badge {
+.app-detail-page .sync-badge {
   padding: 0.25rem 0.75rem;
   border-radius: 6px;
   font-size: 0.875rem;
   font-weight: 600;
 }
 
-.sync-synced {
+.app-detail-page .sync-synced {
   background: #d1fae5;
   color: #065f46;
 }
 
-.sync-outofsync {
+.app-detail-page .sync-outofsync {
   background: #fecaca;
   color: #991b1b;
 }
 
-.sync-unknown {
+.app-detail-page .sync-unknown {
   background: #e5e7eb;
   color: #4b5563;
 }
@@ -262,24 +264,25 @@
   font-size: 0.875rem;
 }
 
-.pod-status {
+/* Scope pod status badges to detail page only */
+.app-detail-page .pod-status {
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-size: 0.875rem;
   font-weight: 600;
 }
 
-.status-running {
+.app-detail-page .status-running {
   background: #d1fae5;
   color: #065f46;
 }
 
-.status-pending {
+.app-detail-page .status-pending {
   background: #fef3c7;
   color: #92400e;
 }
 
-.status-failed {
+.app-detail-page .status-failed {
   background: #fecaca;
   color: #991b1b;
 }
