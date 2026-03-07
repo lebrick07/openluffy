@@ -521,7 +521,7 @@ def luffy_action(request: LuffyActionRequest):
 
 # ============================================================================
 
-@app.get("/customers")
+@app.get("/api/customers")
 def get_customers():
     """Get all customer deployments with multi-environment support - dynamically discovered"""
     if not k8s_available:
@@ -1552,7 +1552,7 @@ async def delete_customer(customer_id: str, request: Request, db: Session = Depe
         
     except Exception as e:
         return JSONResponse(status_code=500, content={'error': str(e)})
-@app.get("/deployments")
+@app.get("/api/deployments")
 def get_deployments():
     """Get deployments with control plane / customer separation
     
