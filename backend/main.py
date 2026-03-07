@@ -403,7 +403,7 @@ class LuffyActionRequest(BaseModel):
     action: str
     context: Optional[Dict[str, Any]] = None
 
-@app.post("/luffy/chat")
+@app.post("/api/luffy/chat")
 async def luffy_chat(request: LuffyChatRequest):
     """
     Luffy AI Chat - Intelligent Conversational AI DevOps Engineer
