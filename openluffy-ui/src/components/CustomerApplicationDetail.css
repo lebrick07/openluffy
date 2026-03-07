@@ -2,10 +2,12 @@
   padding: 2rem;
   max-width: 1400px;
   margin: 0 auto;
+  background: #0d1117;
+  min-height: 100vh;
 }
 
 .back-link {
-  color: var(--primary-color, #6366f1);
+  color: #58a6ff;
   text-decoration: none;
   font-size: 0.95rem;
   margin-bottom: 1rem;
@@ -17,17 +19,18 @@
 }
 
 .detail-header {
-  background: white;
+  background: #161b22;
+  border: 1px solid #30363d;
   border-radius: 12px;
   padding: 2rem;
   margin-bottom: 2rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .detail-title {
   font-size: 2rem;
   margin: 0 0 0.5rem 0;
-  color: #1f2937;
+  color: #f0f6fc;
 }
 
 .detail-badges {
@@ -46,18 +49,21 @@
 }
 
 .app-detail-page .env-dev {
-  background: #dbeafe;
-  color: #1e40af;
+  background: #1e3a5f;
+  color: #58a6ff;
+  border: 1px solid #30363d;
 }
 
 .app-detail-page .env-preprod {
-  background: #fef3c7;
-  color: #92400e;
+  background: #3d2e00;
+  color: #f0b429;
+  border: 1px solid #30363d;
 }
 
 .app-detail-page .env-prod {
-  background: #fecaca;
-  color: #991b1b;
+  background: #4c1d1d;
+  color: #ff7b72;
+  border: 1px solid #30363d;
 }
 
 /* Scope health and sync badges to detail page only */
@@ -69,23 +75,27 @@
 }
 
 .app-detail-page .health-healthy {
-  background: #d1fae5;
-  color: #065f46;
+  background: #0f3a26;
+  color: #2ea043;
+  border: 1px solid #30363d;
 }
 
 .app-detail-page .health-degraded {
-  background: #fed7aa;
-  color: #9a3412;
+  background: #3d2e00;
+  color: #f0b429;
+  border: 1px solid #30363d;
 }
 
 .app-detail-page .health-progressing {
-  background: #dbeafe;
-  color: #1e40af;
+  background: #1e3a5f;
+  color: #58a6ff;
+  border: 1px solid #30363d;
 }
 
 .app-detail-page .health-unknown {
-  background: #e5e7eb;
-  color: #4b5563;
+  background: #21262d;
+  color: #7d8590;
+  border: 1px solid #30363d;
 }
 
 .app-detail-page .sync-badge {
@@ -96,22 +106,25 @@
 }
 
 .app-detail-page .sync-synced {
-  background: #d1fae5;
-  color: #065f46;
+  background: #0f3a26;
+  color: #2ea043;
+  border: 1px solid #30363d;
 }
 
 .app-detail-page .sync-outofsync {
-  background: #fecaca;
-  color: #991b1b;
+  background: #4c1d1d;
+  color: #ff7b72;
+  border: 1px solid #30363d;
 }
 
 .app-detail-page .sync-unknown {
-  background: #e5e7eb;
-  color: #4b5563;
+  background: #21262d;
+  color: #7d8590;
+  border: 1px solid #30363d;
 }
 
 .detail-subtitle {
-  color: #6b7280;
+  color: #7d8590;
   font-size: 0.875rem;
   margin-top: 0.5rem;
 }
@@ -128,7 +141,7 @@
 .action-btn-danger {
   padding: 0.5rem 1rem;
   border-radius: 8px;
-  border: none;
+  border: 1px solid #30363d;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
@@ -136,31 +149,31 @@
 }
 
 .action-btn-primary {
-  background: var(--primary-color, #6366f1);
+  background: #238636;
   color: white;
 }
 
 .action-btn-primary:hover:not(:disabled) {
-  background: #4f46e5;
+  background: #2ea043;
   transform: translateY(-1px);
 }
 
 .action-btn-secondary {
-  background: #e5e7eb;
-  color: #374151;
+  background: #21262d;
+  color: #c9d1d9;
 }
 
 .action-btn-secondary:hover:not(:disabled) {
-  background: #d1d5db;
+  background: #30363d;
 }
 
 .action-btn-danger {
-  background: #fecaca;
-  color: #991b1b;
+  background: #4c1d1d;
+  color: #ff7b72;
 }
 
 .action-btn-danger:hover:not(:disabled) {
-  background: #fca5a5;
+  background: #662626;
 }
 
 .action-btn-primary:disabled,
@@ -174,7 +187,7 @@
   display: flex;
   gap: 0.5rem;
   margin-bottom: 1.5rem;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid #30363d;
   overflow-x: auto;
 }
 
@@ -185,18 +198,18 @@
   border-bottom: 3px solid transparent;
   cursor: pointer;
   font-weight: 500;
-  color: #6b7280;
+  color: #7d8590;
   transition: all 0.2s;
   white-space: nowrap;
 }
 
 .tab:hover {
-  color: #374151;
+  color: #c9d1d9;
 }
 
 .tab.active {
-  color: var(--primary-color, #6366f1);
-  border-bottom-color: var(--primary-color, #6366f1);
+  color: #58a6ff;
+  border-bottom-color: #58a6ff;
 }
 
 .detail-content {
@@ -204,17 +217,18 @@
 }
 
 .detail-card {
-  background: white;
+  background: #161b22;
+  border: 1px solid #30363d;
   border-radius: 12px;
   padding: 1.5rem;
   margin-bottom: 1.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .detail-card h3 {
   margin: 0 0 1rem 0;
   font-size: 1.125rem;
-  color: #1f2937;
+  color: #f0f6fc;
 }
 
 .replicas-grid {
@@ -230,7 +244,7 @@
 }
 
 .stat-label {
-  color: #6b7280;
+  color: #7d8590;
   font-size: 0.875rem;
   font-weight: 500;
 }
@@ -238,7 +252,7 @@
 .stat-value {
   font-size: 2rem;
   font-weight: 700;
-  color: #1f2937;
+  color: #f0f6fc;
 }
 
 .pods-table,
@@ -253,15 +267,20 @@
 .pods-detail-table td {
   padding: 0.75rem;
   text-align: left;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #30363d;
 }
 
 .pods-table th,
 .pods-detail-table th {
-  background: #f9fafb;
+  background: #0d1117;
   font-weight: 600;
-  color: #374151;
+  color: #7d8590;
   font-size: 0.875rem;
+}
+
+.pods-table td,
+.pods-detail-table td {
+  color: #c9d1d9;
 }
 
 /* Scope pod status badges to detail page only */
@@ -273,28 +292,30 @@
 }
 
 .app-detail-page .status-running {
-  background: #d1fae5;
-  color: #065f46;
+  background: #0f3a26;
+  color: #2ea043;
 }
 
 .app-detail-page .status-pending {
-  background: #fef3c7;
-  color: #92400e;
+  background: #3d2e00;
+  color: #f0b429;
 }
 
 .app-detail-page .status-failed {
-  background: #fecaca;
-  color: #991b1b;
+  background: #4c1d1d;
+  color: #ff7b72;
 }
 
 .image-display {
-  background: #f3f4f6;
+  background: #0d1117;
+  border: 1px solid #30363d;
   padding: 0.75rem;
   border-radius: 6px;
   display: block;
   font-family: 'Monaco', 'Courier New', monospace;
   font-size: 0.875rem;
   word-break: break-all;
+  color: #c9d1d9;
 }
 
 .config-grid {
@@ -310,13 +331,13 @@
 }
 
 .config-label {
-  color: #6b7280;
+  color: #7d8590;
   font-size: 0.875rem;
   font-weight: 500;
 }
 
 .config-value {
-  color: #1f2937;
+  color: #f0f6fc;
   font-weight: 600;
 }
 
@@ -328,59 +349,59 @@
 
 .event-item {
   padding: 0.75rem;
-  border-left: 3px solid #e5e7eb;
+  border-left: 3px solid #30363d;
   border-radius: 4px;
-  background: #f9fafb;
+  background: #0d1117;
 }
 
 .event-normal {
-  border-left-color: #3b82f6;
+  border-left-color: #58a6ff;
 }
 
 .event-warning {
-  border-left-color: #f59e0b;
-  background: #fef3c7;
+  border-left-color: #f0b429;
+  background: #3d2e00;
 }
 
 .event-error {
-  border-left-color: #ef4444;
-  background: #fee2e2;
+  border-left-color: #ff7b72;
+  background: #4c1d1d;
 }
 
 .event-time {
-  color: #6b7280;
+  color: #7d8590;
   font-size: 0.75rem;
   margin-right: 0.5rem;
 }
 
 .event-type {
-  color: #374151;
+  color: #c9d1d9;
   font-weight: 600;
   font-size: 0.875rem;
   margin-right: 0.5rem;
 }
 
 .event-reason {
-  color: #6b7280;
+  color: #7d8590;
   font-size: 0.875rem;
 }
 
 .event-message {
   margin: 0.5rem 0 0 0;
-  color: #374151;
+  color: #c9d1d9;
   font-size: 0.875rem;
 }
 
 .container-info {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: #7d8590;
 }
 
 .detail-loading,
 .detail-error {
   text-align: center;
   padding: 4rem;
-  color: #6b7280;
+  color: #7d8590;
   font-size: 1.125rem;
 }
 

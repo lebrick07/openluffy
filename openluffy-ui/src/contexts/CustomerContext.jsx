@@ -13,7 +13,7 @@ export const useCustomer = () => {
 
 export const CustomerProvider = ({ children }) => {
   const [customers, setCustomers] = useState([])
-  const [selectedCustomer, setSelectedCustomer] = useState(null)
+  const [selectedCustomer, setSelectedCustomer] = useState('control-plane') // Default to control plane view
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
