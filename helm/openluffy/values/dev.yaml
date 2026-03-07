@@ -1,10 +1,11 @@
 # Development Environment
 namespace: openluffy-dev
+environment: dev
 
 backend:
   image:
     repository: ghcr.io/lebrick07/openluffy-backend
-    tag: dev-bc2a9e9 # backend
+    tag: dev-11c46d2 # backend
     pullPolicy: IfNotPresent
   replicas: 1
   service:
@@ -14,7 +15,7 @@ backend:
 frontend:
   image:
     repository: ghcr.io/lebrick07/openluffy-frontend
-    tag: dev-bc2a9e9 # frontend
+    tag: dev-11c46d2 # frontend
     pullPolicy: IfNotPresent
   replicas: 1
   service:

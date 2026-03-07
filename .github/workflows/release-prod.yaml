@@ -160,7 +160,14 @@ jobs:
           git pull --rebase origin main || true
           git push
 
-      - name: Inject secrets to ArgoCD
+  # Inject secrets into ArgoCD Application
+  inject-secrets:
+    name: Inject Secrets to ArgoCD
+    runs-on: openluffy-runner
+    needs: [build-and-push]
+    
+    steps:
+      - name: Update ArgoCD Application with secret parameters
         run: |
           kubectl patch application openluffy-prod -n argocd --type merge --patch '
           spec:

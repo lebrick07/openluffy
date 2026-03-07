@@ -43,6 +43,8 @@ spec:
               containerPort: 8000
               protocol: TCP
           env:
+            - name: OPENLUFFY_ENV
+              value: {{ .Values.environment | default "dev" | quote }}
             - name: AWS_ROLE_ARN
               value: {{ .Values.aws.roleArn | quote }}
             - name: OPENCLAW_URL

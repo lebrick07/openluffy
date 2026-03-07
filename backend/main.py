@@ -31,6 +31,11 @@ from danger_zone import (
     delete_customer_permanently, transfer_customer_ownership,
     revoke_all_customer_tokens
 )
+from deployment_actions import (
+    deploy_application, rollback_application, scale_application,
+    restart_application, get_sync_status,
+    DeployRequest, RollbackRequest, ScaleRequest, ActionResponse
+)
 
 app = FastAPI(title="openluffy")
 
@@ -66,6 +71,42 @@ app.add_api_route("/api/v1/customers/{customer_id}/danger-zone/disable", disable
 app.add_api_route("/api/v1/customers/{customer_id}/danger-zone/delete-permanent", delete_customer_permanently, methods=["POST"], tags=["danger-zone"])
 app.add_api_route("/api/v1/customers/{customer_id}/danger-zone/transfer-ownership", transfer_customer_ownership, methods=["POST"], tags=["danger-zone"])
 app.add_api_route("/api/v1/customers/{customer_id}/danger-zone/revoke-tokens", revoke_all_customer_tokens, methods=["POST"], tags=["danger-zone"])
+
+# Deployment action routes (deploy, rollback, scale, restart)
+app.add_api_route(
+    "/api/v1/deployments/{deployment_id}/deploy",
+    deploy_application,
+    methods=["POST"],
+    tags=["deployments"],
+    response_model=ActionResponse
+)
+app.add_api_route(
+    "/api/v1/deployments/{deployment_id}/rollback",
+    rollback_application,
+    methods=["POST"],
+    tags=["deployments"],
+    response_model=ActionResponse
+)
+app.add_api_route(
+    "/api/v1/deployments/{deployment_id}/scale",
+    scale_application,
+    methods=["POST"],
+    tags=["deployments"],
+    response_model=ActionResponse
+)
+app.add_api_route(
+    "/api/v1/deployments/{deployment_id}/restart",
+    restart_application,
+    methods=["POST"],
+    tags=["deployments"],
+    response_model=ActionResponse
+)
+app.add_api_route(
+    "/api/v1/deployments/{deployment_id}/sync-status",
+    get_sync_status,
+    methods=["GET"],
+    tags=["deployments"]
+)
 
 # Database initialization flag
 db_available = False
@@ -1501,9 +1542,13 @@ async def delete_customer(customer_id: str, request: Request, db: Session = Depe
         return JSONResponse(status_code=500, content={'error': str(e)})
 @app.get("/deployments")
 def get_deployments():
-    """Get all deployments across all customer namespaces and environments - dynamically discovered"""
+    """Get deployments for current environment only (environment isolation)"""
     if not k8s_available:
         return {'error': 'K8s not available', 'deployments': [], 'total': 0}
+    
+    # Get current OpenLuffy environment (dev, preprod, or prod)
+    current_env = os.getenv('OPENLUFFY_ENV', 'dev').lower()
+    print(f"ℹ️  Filtering deployments for environment: {current_env}")
     
     deployments = []
     
@@ -1515,11 +1560,20 @@ def get_deployments():
             ns_name = ns_obj.metadata.name
             labels = ns_obj.metadata.labels or {}
             
-            # Check if this is a customer namespace
+            # Check if this is a customer namespace or OpenLuffy control plane
             customer_id = None
             env = None
             
-            if 'customer' in labels and 'environment' in labels:
+            # Check for OpenLuffy control plane namespace (openluffy-{env})
+            if ns_name.startswith('openluffy-'):
+                if ns_name == f'openluffy-{current_env}':
+                    # This is our control plane namespace
+                    customer_id = 'Openluffy'
+                    env = current_env
+                else:
+                    # This is a different environment's control plane - skip it
+                    continue
+            elif 'customer' in labels and 'environment' in labels:
                 # Namespace created by OpenLuffy (has our labels)
                 customer_id = labels['customer']
                 env = labels['environment']
@@ -1536,6 +1590,10 @@ def get_deployments():
                     env = 'prod'
             
             if customer_id and env:
+                # Environment isolation: only show deployments for current environment
+                if env != current_env:
+                    continue  # Skip namespaces from other environments
+                
                 # Get deployments from this namespace
                 try:
                     deploys = apps_v1.list_namespaced_deployment(ns_name)
