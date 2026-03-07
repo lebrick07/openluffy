@@ -4,6 +4,7 @@ on:
   pull_request:
     types: [closed]
     branches: [main]
+  workflow_dispatch:  # Allow manual triggers
 
 env:
   REGISTRY: ghcr.io
@@ -14,7 +15,10 @@ jobs:
   promote-backend:
     name: Promote Backend
     runs-on: openluffy-runner
-    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
+    # Only run on PR merges from develop branch OR manual workflow_dispatch
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop') ||
+      (github.event_name == 'workflow_dispatch')
     permissions:
       packages: write
     outputs:
@@ -164,7 +168,7 @@ jobs:
   inject-secrets:
     name: Inject Secrets to ArgoCD
     runs-on: openluffy-runner
-    needs: [update-prod-manifests]
+    needs: [deploy-prod]
     
     steps:
       - name: Update ArgoCD Application with secret parameters
