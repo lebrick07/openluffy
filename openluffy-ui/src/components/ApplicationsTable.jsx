@@ -4,12 +4,11 @@ import { useCustomer } from '../contexts/CustomerContext'
 import './ApplicationsTable.css'
 
 function ApplicationsTable({ selectedEnvironment }) {
-  const { activeCustomer } = useCustomer()
+  const { activeCustomer, selectedCustomer } = useCustomer()
   const navigate = useNavigate()
   const [deployments, setDeployments] = useState([])
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [viewMode, setViewMode] = useState('customers') // 'customers' or 'control_plane'
 
   useEffect(() => {
     fetchData()
@@ -199,15 +198,18 @@ function ApplicationsTable({ selectedEnvironment }) {
     }
   }
 
-  // Get deployments based on view mode
-  const currentDeployments = viewMode === 'control_plane' 
+  // Determine if we're showing control plane or customer workloads
+  const isControlPlaneView = selectedCustomer === 'control-plane'
+  
+  // Get deployments based on view
+  const currentDeployments = isControlPlaneView
     ? (deployments.control_plane || [])
     : (deployments.customers || [])
 
   // Filter deployments
   const filtered = currentDeployments.filter(d => {
     // In control plane view, don't filter by customer
-    if (viewMode === 'customers' && activeCustomer && d.customer !== activeCustomer.id) return false
+    if (!isControlPlaneView && activeCustomer && d.customer !== activeCustomer.id) return false
     if (selectedEnvironment !== 'all' && d.environment !== selectedEnvironment) return false
     return true
   })
@@ -221,14 +223,6 @@ function ApplicationsTable({ selectedEnvironment }) {
       <div className="table-header-bar">
         <h2>Applications</h2>
         <div className="table-controls">
-          <select 
-            className="view-mode-selector"
-            value={viewMode}
-            onChange={(e) => setViewMode(e.target.value)}
-          >
-            <option value="customers">View: Customers</option>
-            <option value="control_plane">View: Control Plane</option>
-          </select>
           <span className="table-count">{filtered.length} deployments</span>
         </div>
       </div>
@@ -236,8 +230,8 @@ function ApplicationsTable({ selectedEnvironment }) {
       <table className="applications-table">
         <thead>
           <tr>
-            {viewMode === 'customers' && <th>Customer</th>}
-            <th>{viewMode === 'control_plane' ? 'Component' : 'Application'}</th>
+            {!isControlPlaneView && <th>Customer</th>}
+            <th>{isControlPlaneView ? 'Component' : 'Application'}</th>
             <th>Environment</th>
             <th>Status</th>
             <th>Pods</th>
@@ -250,8 +244,8 @@ function ApplicationsTable({ selectedEnvironment }) {
         <tbody>
           {filtered.length === 0 ? (
             <tr>
-              <td colSpan={viewMode === 'customers' ? 9 : 8} className="no-data">
-                {viewMode === 'control_plane' 
+              <td colSpan={isControlPlaneView ? 8 : 9} className="no-data">
+                {isControlPlaneView
                   ? 'No control plane deployments found'
                   : !activeCustomer 
                     ? '👤 Select a customer from the dropdown to view their applications'
@@ -267,7 +261,7 @@ function ApplicationsTable({ selectedEnvironment }) {
                 className="table-row"
                 style={{ cursor: 'pointer' }}
               >
-                {viewMode === 'customers' && (
+                {!isControlPlaneView && (
                   <td className="cell-customer">
                     <span className="customer-name">{getCustomerName(deployment.customer)}</span>
                   </td>
