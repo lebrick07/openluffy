@@ -6,7 +6,7 @@ import './ApplicationsTable.css'
 function ApplicationsTable({ selectedEnvironment }) {
   const { activeCustomer, selectedCustomer } = useCustomer()
   const navigate = useNavigate()
-  const [deployments, setDeployments] = useState([])
+  const [deployments, setDeployments] = useState({ control_plane: [], customers: [] })
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -26,15 +26,23 @@ function ApplicationsTable({ selectedEnvironment }) {
       const deploymentsData = await deploymentsRes.json()
       const customersData = await customersRes.json()
       
+      console.log('📊 Deployments data:', deploymentsData)
+      console.log('👥 Customers data:', customersData)
+      
       // New response structure: { control_plane: [...], customers: [...] }
       const allDeployments = {
         control_plane: deploymentsData.control_plane || [],
         customers: deploymentsData.customers || []
       }
+      
+      console.log('🎯 Setting deployments:', allDeployments)
+      console.log('  - Control plane:', allDeployments.control_plane.length, 'pods')
+      console.log('  - Customers:', allDeployments.customers.length, 'pods')
+      
       setDeployments(allDeployments)
       setCustomers(customersData.customers || [])
     } catch (error) {
-      console.error('Error fetching data:', error)
+      console.error('❌ Error fetching data:', error)
     } finally {
       setLoading(false)
     }
@@ -201,10 +209,19 @@ function ApplicationsTable({ selectedEnvironment }) {
   // Determine if we're showing control plane or customer workloads
   const isControlPlaneView = selectedCustomer === 'control-plane'
   
+  console.log('🔍 View state:', {
+    selectedCustomer,
+    isControlPlaneView,
+    selectedEnvironment,
+    activeCustomer: activeCustomer?.id
+  })
+  
   // Get deployments based on view
   const currentDeployments = isControlPlaneView
     ? (deployments.control_plane || [])
     : (deployments.customers || [])
+
+  console.log('📦 Current deployments for view:', currentDeployments.length, 'items')
 
   // Filter deployments
   const filtered = currentDeployments.filter(d => {
@@ -213,6 +230,8 @@ function ApplicationsTable({ selectedEnvironment }) {
     if (selectedEnvironment !== 'all' && d.environment !== selectedEnvironment) return false
     return true
   })
+  
+  console.log('✅ Filtered deployments:', filtered.length, 'items')
 
   if (loading) {
     return <div className="applications-table-loading">Loading applications...</div>
