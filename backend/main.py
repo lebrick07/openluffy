@@ -31,6 +31,11 @@ from danger_zone import (
     delete_customer_permanently, transfer_customer_ownership,
     revoke_all_customer_tokens
 )
+from deployment_actions import (
+    deploy_application, rollback_application, scale_application,
+    restart_application, get_sync_status,
+    DeployRequest, RollbackRequest, ScaleRequest, ActionResponse
+)
 
 app = FastAPI(title="openluffy")
 
@@ -66,6 +71,42 @@ app.add_api_route("/api/v1/customers/{customer_id}/danger-zone/disable", disable
 app.add_api_route("/api/v1/customers/{customer_id}/danger-zone/delete-permanent", delete_customer_permanently, methods=["POST"], tags=["danger-zone"])
 app.add_api_route("/api/v1/customers/{customer_id}/danger-zone/transfer-ownership", transfer_customer_ownership, methods=["POST"], tags=["danger-zone"])
 app.add_api_route("/api/v1/customers/{customer_id}/danger-zone/revoke-tokens", revoke_all_customer_tokens, methods=["POST"], tags=["danger-zone"])
+
+# Deployment action routes (deploy, rollback, scale, restart)
+app.add_api_route(
+    "/api/v1/deployments/{deployment_id}/deploy",
+    deploy_application,
+    methods=["POST"],
+    tags=["deployments"],
+    response_model=ActionResponse
+)
+app.add_api_route(
+    "/api/v1/deployments/{deployment_id}/rollback",
+    rollback_application,
+    methods=["POST"],
+    tags=["deployments"],
+    response_model=ActionResponse
+)
+app.add_api_route(
+    "/api/v1/deployments/{deployment_id}/scale",
+    scale_application,
+    methods=["POST"],
+    tags=["deployments"],
+    response_model=ActionResponse
+)
+app.add_api_route(
+    "/api/v1/deployments/{deployment_id}/restart",
+    restart_application,
+    methods=["POST"],
+    tags=["deployments"],
+    response_model=ActionResponse
+)
+app.add_api_route(
+    "/api/v1/deployments/{deployment_id}/sync-status",
+    get_sync_status,
+    methods=["GET"],
+    tags=["deployments"]
+)
 
 # Database initialization flag
 db_available = False
