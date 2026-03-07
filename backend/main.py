@@ -1554,14 +1554,14 @@ async def delete_customer(customer_id: str, request: Request, db: Session = Depe
         return JSONResponse(status_code=500, content={'error': str(e)})
 @app.get("/deployments")
 def get_deployments():
-    """Get deployments with proper customer isolation
+    """Get deployments with control plane / customer separation
     
-    Shows:
-    - Control plane: Only openluffy-{current_env} deployments
-    - Customers: All environments for customers created_from_env == current_env
+    Returns two separate arrays:
+    - control_plane: OpenLuffy infrastructure (openluffy-{current_env} only)
+    - customers: Customer workloads (all envs for customers created from current_env)
     """
     if not k8s_available:
-        return {'error': 'K8s not available', 'deployments': [], 'total': 0}
+        return {'error': 'K8s not available', 'control_plane': [], 'customers': [], 'total': 0}
     
     # Get current OpenLuffy environment (dev, preprod, or prod)
     current_env = os.getenv('OPENLUFFY_ENV', 'dev').lower()
@@ -1582,7 +1582,8 @@ def get_deployments():
         except Exception as e:
             print(f"⚠️  Failed to query customers: {e}")
     
-    deployments = []
+    control_plane = []
+    customer_deployments = []
     
     # Discover all customer namespaces dynamically
     try:
@@ -1622,11 +1623,10 @@ def get_deployments():
                     env = 'prod'
             
             if customer_id and env:
-                # Control plane isolation: only show current env's control plane
-                if customer_id == 'Openluffy':
-                    # Control plane - already filtered above to only show openluffy-{current_env}
-                    pass
-                else:
+                # Separate control plane from customer workloads
+                is_control_plane = (customer_id == 'Openluffy')
+                
+                if not is_control_plane:
                     # Customer namespace - only show if customer was created from this env
                     if customer_id not in customers_from_this_env:
                         continue  # Skip customers created from other environments
@@ -1640,7 +1640,7 @@ def get_deployments():
                         replicas = deploy.status.replicas or 0
                         ready = deploy.status.ready_replicas or 0
                         
-                        deployments.append({
+                        deployment_data = {
                             'id': f"{ns_name}-{name}",
                             'name': name,
                             'namespace': ns_name,
@@ -1650,7 +1650,13 @@ def get_deployments():
                             'ready': ready,
                             'status': 'running' if ready == replicas and ready > 0 else 'degraded',
                             'image': deploy.spec.template.spec.containers[0].image
-                        })
+                        }
+                        
+                        if is_control_plane:
+                            control_plane.append(deployment_data)
+                        else:
+                            customer_deployments.append(deployment_data)
+                            
                 except ApiException as e:
                     # Namespace exists but no deployments or access denied
                     pass
@@ -1658,7 +1664,14 @@ def get_deployments():
     except Exception as e:
         print(f"Error discovering deployments: {e}")
     
-    return {'deployments': deployments, 'total': len(deployments)}
+    total = len(control_plane) + len(customer_deployments)
+    print(f"ℹ️  Returning {len(control_plane)} control plane + {len(customer_deployments)} customer deployments = {total} total")
+    
+    return {
+        'control_plane': control_plane,
+        'customers': customer_deployments,
+        'total': total
+    }
 
 # Integration models
 class IntegrationConfig(BaseModel):
