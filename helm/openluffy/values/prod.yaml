@@ -1,5 +1,6 @@
 # Production Environment
 namespace: openluffy-prod
+environment: prod
 
 backend:
   image:

@@ -1,5 +1,6 @@
 # Development Environment
 namespace: openluffy-dev
+environment: dev
 
 backend:
   image:
