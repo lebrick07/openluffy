@@ -9,6 +9,7 @@ function ApplicationsTable({ selectedEnvironment }) {
   const [deployments, setDeployments] = useState([])
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [viewMode, setViewMode] = useState('customers') // 'customers' or 'control_plane'
 
   useEffect(() => {
     fetchData()
@@ -26,7 +27,12 @@ function ApplicationsTable({ selectedEnvironment }) {
       const deploymentsData = await deploymentsRes.json()
       const customersData = await customersRes.json()
       
-      setDeployments(deploymentsData.deployments || [])
+      // New response structure: { control_plane: [...], customers: [...] }
+      const allDeployments = {
+        control_plane: deploymentsData.control_plane || [],
+        customers: deploymentsData.customers || []
+      }
+      setDeployments(allDeployments)
       setCustomers(customersData.customers || [])
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -193,9 +199,15 @@ function ApplicationsTable({ selectedEnvironment }) {
     }
   }
 
+  // Get deployments based on view mode
+  const currentDeployments = viewMode === 'control_plane' 
+    ? (deployments.control_plane || [])
+    : (deployments.customers || [])
+
   // Filter deployments
-  const filtered = deployments.filter(d => {
-    if (activeCustomer && d.customer !== activeCustomer.id) return false
+  const filtered = currentDeployments.filter(d => {
+    // In control plane view, don't filter by customer
+    if (viewMode === 'customers' && activeCustomer && d.customer !== activeCustomer.id) return false
     if (selectedEnvironment !== 'all' && d.environment !== selectedEnvironment) return false
     return true
   })
@@ -208,14 +220,24 @@ function ApplicationsTable({ selectedEnvironment }) {
     <div className="applications-table-container">
       <div className="table-header-bar">
         <h2>Applications</h2>
-        <span className="table-count">{filtered.length} deployments</span>
+        <div className="table-controls">
+          <select 
+            className="view-mode-selector"
+            value={viewMode}
+            onChange={(e) => setViewMode(e.target.value)}
+          >
+            <option value="customers">View: Customers</option>
+            <option value="control_plane">View: Control Plane</option>
+          </select>
+          <span className="table-count">{filtered.length} deployments</span>
+        </div>
       </div>
 
       <table className="applications-table">
         <thead>
           <tr>
-            <th>Customer</th>
-            <th>Application</th>
+            {viewMode === 'customers' && <th>Customer</th>}
+            <th>{viewMode === 'control_plane' ? 'Component' : 'Application'}</th>
             <th>Environment</th>
             <th>Status</th>
             <th>Pods</th>
@@ -228,10 +250,12 @@ function ApplicationsTable({ selectedEnvironment }) {
         <tbody>
           {filtered.length === 0 ? (
             <tr>
-              <td colSpan="9" className="no-data">
-                {!activeCustomer 
-                  ? '👤 Select a customer from the dropdown to view their applications'
-                  : `No applications found for ${activeCustomer.name}${selectedEnvironment !== 'all' ? ` in ${selectedEnvironment} environment` : ''}`
+              <td colSpan={viewMode === 'customers' ? 9 : 8} className="no-data">
+                {viewMode === 'control_plane' 
+                  ? 'No control plane deployments found'
+                  : !activeCustomer 
+                    ? '👤 Select a customer from the dropdown to view their applications'
+                    : `No applications found for ${activeCustomer.name}${selectedEnvironment !== 'all' ? ` in ${selectedEnvironment} environment` : ''}`
                 }
               </td>
             </tr>
@@ -243,9 +267,11 @@ function ApplicationsTable({ selectedEnvironment }) {
                 className="table-row"
                 style={{ cursor: 'pointer' }}
               >
-                <td className="cell-customer">
-                  <span className="customer-name">{getCustomerName(deployment.customer)}</span>
-                </td>
+                {viewMode === 'customers' && (
+                  <td className="cell-customer">
+                    <span className="customer-name">{getCustomerName(deployment.customer)}</span>
+                  </td>
+                )}
                 <td className="cell-app">
                   <span className="app-name">{deployment.name}</span>
                 </td>
