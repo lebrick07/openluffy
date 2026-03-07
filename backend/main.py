@@ -579,7 +579,7 @@ def get_customers():
                     customer_id = ns_name.replace('-prod', '')
                     env = 'prod'
             
-            if customer_id and env:
+            if customer_id and env and customer_id != 'openluffy':  # Exclude control plane
                 if customer_id not in customer_map:
                     # Try to get customer metadata from integrations or namespace labels
                     customer_name = labels.get('customer-name', customer_id.replace('-', ' ').title())
