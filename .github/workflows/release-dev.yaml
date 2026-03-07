@@ -147,7 +147,7 @@ jobs:
   inject-secrets:
     name: Inject Secrets to ArgoCD
     runs-on: openluffy-runner
-    needs: [build-and-push]
+    needs: [update-dev-manifests]
     
     steps:
       - name: Install kubectl
