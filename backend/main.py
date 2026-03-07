@@ -610,13 +610,38 @@ def get_customers():
         # Fall back to empty list - no customers found
         return {'customers': [], 'total': 0}
     
-    # Build environment status for each discovered customer
-    for customer_id in customer_map:
-        envs = [get_env_status(customer_id, env) for env in ['dev', 'preprod', 'prod']]
-        customer_map[customer_id]['environments'] = envs
-        customer_map[customer_id]['overallStatus'] = 'running' if any(e['status'] == 'running' for e in envs) else 'error'
+    # Filter by created_from_env (environment isolation)
+    current_env = os.getenv('OPENLUFFY_ENV', 'dev').lower()
+    allowed_customers = set()
     
-    customers = list(customer_map.values())
+    if db_available:
+        try:
+            from database import SessionLocal
+            db = SessionLocal()
+            try:
+                customers_from_db = db.query(Customer).filter(Customer.created_from_env == current_env).all()
+                allowed_customers = {c.id for c in customers_from_db}
+                print(f"ℹ️  [/api/customers] Found {len(allowed_customers)} customers created from {current_env}: {allowed_customers}")
+            finally:
+                db.close()
+        except Exception as e:
+            print(f"⚠️  [/api/customers] Failed to query database: {e}")
+            # If database fails, fall back to showing all discovered customers
+            allowed_customers = set(customer_map.keys())
+    else:
+        # No database, show all discovered customers
+        allowed_customers = set(customer_map.keys())
+    
+    # Filter customer_map to only include allowed customers
+    filtered_customer_map = {cid: data for cid, data in customer_map.items() if cid in allowed_customers}
+    
+    # Build environment status for each allowed customer
+    for customer_id in filtered_customer_map:
+        envs = [get_env_status(customer_id, env) for env in ['dev', 'preprod', 'prod']]
+        filtered_customer_map[customer_id]['environments'] = envs
+        filtered_customer_map[customer_id]['overallStatus'] = 'running' if any(e['status'] == 'running' for e in envs) else 'error'
+    
+    customers = list(filtered_customer_map.values())
     
     return {'customers': customers, 'total': len(customers)}
 
