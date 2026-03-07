@@ -45,6 +45,8 @@ spec:
           env:
             - name: OPENLUFFY_ENV
               value: {{ .Values.environment | default "dev" | quote }}
+            - name: RUN_MIGRATIONS
+              value: "true"
             - name: AWS_ROLE_ARN
               value: {{ .Values.aws.roleArn | quote }}
             - name: OPENCLAW_URL

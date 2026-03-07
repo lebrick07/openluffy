@@ -17,6 +17,7 @@ class Customer(Base):
     name = Column(String(200), nullable=False)  # Display name
     stack = Column(String(50), nullable=False)  # nodejs, python, go
     github_repo = Column(String(200))  # org/repo
+    created_from_env = Column(String(20), default='dev', nullable=False)  # Which OpenLuffy env created this customer
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -30,6 +31,7 @@ class Customer(Base):
             'name': self.name,
             'stack': self.stack,
             'github_repo': self.github_repo,
+            'created_from_env': self.created_from_env,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

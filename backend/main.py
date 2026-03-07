@@ -186,6 +186,15 @@ async def startup_event():
                     finally:
                         db.close()
                     
+                    # Run database migrations if enabled
+                    if os.getenv('RUN_MIGRATIONS', '').lower() in ['true', '1', 'yes']:
+                        print("🔨 Running database migrations...")
+                        try:
+                            from database.migrations.add_created_from_env import run_migration
+                            run_migration()
+                        except Exception as migration_error:
+                            print(f"⚠️  Migration warning: {migration_error}")
+                    
                     break
                 else:
                     raise Exception("Connection check failed")
@@ -1057,14 +1066,17 @@ async def create_customer(request: Request):
                     # Check if customer already exists
                     existing_customer = db.query(Customer).filter(Customer.id == customer_id).first()
                     if not existing_customer:
+                        # Get current OpenLuffy environment to tag the customer
+                        current_env = os.getenv('OPENLUFFY_ENV', 'dev').lower()
                         customer = Customer(
                             id=customer_id,
                             name=customer_name,
-                            stack=stack
+                            stack=stack,
+                            created_from_env=current_env
                         )
                         db.add(customer)
                         db.commit()
-                        print(f"✅ Created customer record: {customer_name} ({customer_id})")
+                        print(f"✅ Created customer record: {customer_name} ({customer_id}) [created_from_env={current_env}]")
                     else:
                         print(f"ℹ️  Customer record already exists: {customer_name} ({customer_id})")
                 except Exception as db_error:
@@ -1542,13 +1554,33 @@ async def delete_customer(customer_id: str, request: Request, db: Session = Depe
         return JSONResponse(status_code=500, content={'error': str(e)})
 @app.get("/deployments")
 def get_deployments():
-    """Get deployments for current environment only (environment isolation)"""
+    """Get deployments with proper customer isolation
+    
+    Shows:
+    - Control plane: Only openluffy-{current_env} deployments
+    - Customers: All environments for customers created_from_env == current_env
+    """
     if not k8s_available:
         return {'error': 'K8s not available', 'deployments': [], 'total': 0}
     
     # Get current OpenLuffy environment (dev, preprod, or prod)
     current_env = os.getenv('OPENLUFFY_ENV', 'dev').lower()
-    print(f"ℹ️  Filtering deployments for environment: {current_env}")
+    print(f"ℹ️  Filtering for current environment: {current_env}")
+    
+    # Get list of customers created from this environment
+    customers_from_this_env = set()
+    if db_available:
+        try:
+            from database import SessionLocal
+            db = SessionLocal()
+            try:
+                customers = db.query(Customer).filter(Customer.created_from_env == current_env).all()
+                customers_from_this_env = {c.id for c in customers}
+                print(f"ℹ️  Found {len(customers_from_this_env)} customers created from {current_env}: {customers_from_this_env}")
+            finally:
+                db.close()
+        except Exception as e:
+            print(f"⚠️  Failed to query customers: {e}")
     
     deployments = []
     
@@ -1590,9 +1622,14 @@ def get_deployments():
                     env = 'prod'
             
             if customer_id and env:
-                # Environment isolation: only show deployments for current environment
-                if env != current_env:
-                    continue  # Skip namespaces from other environments
+                # Control plane isolation: only show current env's control plane
+                if customer_id == 'Openluffy':
+                    # Control plane - already filtered above to only show openluffy-{current_env}
+                    pass
+                else:
+                    # Customer namespace - only show if customer was created from this env
+                    if customer_id not in customers_from_this_env:
+                        continue  # Skip customers created from other environments
                 
                 # Get deployments from this namespace
                 try:
