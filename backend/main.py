@@ -186,6 +186,15 @@ async def startup_event():
                     finally:
                         db.close()
                     
+                    # Run database migrations if enabled
+                    if os.getenv('RUN_MIGRATIONS', '').lower() in ['true', '1', 'yes']:
+                        print("🔨 Running database migrations...")
+                        try:
+                            from database.migrations.add_created_from_env import run_migration
+                            run_migration()
+                        except Exception as migration_error:
+                            print(f"⚠️  Migration warning: {migration_error}")
+                    
                     break
                 else:
                     raise Exception("Connection check failed")
@@ -394,7 +403,7 @@ class LuffyActionRequest(BaseModel):
     action: str
     context: Optional[Dict[str, Any]] = None
 
-@app.post("/luffy/chat")
+@app.post("/api/luffy/chat")
 async def luffy_chat(request: LuffyChatRequest):
     """
     Luffy AI Chat - Intelligent Conversational AI DevOps Engineer
@@ -512,7 +521,7 @@ def luffy_action(request: LuffyActionRequest):
 
 # ============================================================================
 
-@app.get("/customers")
+@app.get("/api/customers")
 def get_customers():
     """Get all customer deployments with multi-environment support - dynamically discovered"""
     if not k8s_available:
@@ -570,7 +579,7 @@ def get_customers():
                     customer_id = ns_name.replace('-prod', '')
                     env = 'prod'
             
-            if customer_id and env:
+            if customer_id and env and customer_id != 'openluffy':  # Exclude control plane
                 if customer_id not in customer_map:
                     # Try to get customer metadata from integrations or namespace labels
                     customer_name = labels.get('customer-name', customer_id.replace('-', ' ').title())
@@ -601,13 +610,38 @@ def get_customers():
         # Fall back to empty list - no customers found
         return {'customers': [], 'total': 0}
     
-    # Build environment status for each discovered customer
-    for customer_id in customer_map:
-        envs = [get_env_status(customer_id, env) for env in ['dev', 'preprod', 'prod']]
-        customer_map[customer_id]['environments'] = envs
-        customer_map[customer_id]['overallStatus'] = 'running' if any(e['status'] == 'running' for e in envs) else 'error'
+    # Filter by created_from_env (environment isolation)
+    current_env = os.getenv('OPENLUFFY_ENV', 'dev').lower()
+    allowed_customers = set()
     
-    customers = list(customer_map.values())
+    if db_available:
+        try:
+            from database import SessionLocal
+            db = SessionLocal()
+            try:
+                customers_from_db = db.query(Customer).filter(Customer.created_from_env == current_env).all()
+                allowed_customers = {c.id for c in customers_from_db}
+                print(f"ℹ️  [/api/customers] Found {len(allowed_customers)} customers created from {current_env}: {allowed_customers}")
+            finally:
+                db.close()
+        except Exception as e:
+            print(f"⚠️  [/api/customers] Failed to query database: {e}")
+            # If database fails, fall back to showing all discovered customers
+            allowed_customers = set(customer_map.keys())
+    else:
+        # No database, show all discovered customers
+        allowed_customers = set(customer_map.keys())
+    
+    # Filter customer_map to only include allowed customers
+    filtered_customer_map = {cid: data for cid, data in customer_map.items() if cid in allowed_customers}
+    
+    # Build environment status for each allowed customer
+    for customer_id in filtered_customer_map:
+        envs = [get_env_status(customer_id, env) for env in ['dev', 'preprod', 'prod']]
+        filtered_customer_map[customer_id]['environments'] = envs
+        filtered_customer_map[customer_id]['overallStatus'] = 'running' if any(e['status'] == 'running' for e in envs) else 'error'
+    
+    customers = list(filtered_customer_map.values())
     
     return {'customers': customers, 'total': len(customers)}
 
@@ -1057,14 +1091,17 @@ async def create_customer(request: Request):
                     # Check if customer already exists
                     existing_customer = db.query(Customer).filter(Customer.id == customer_id).first()
                     if not existing_customer:
+                        # Get current OpenLuffy environment to tag the customer
+                        current_env = os.getenv('OPENLUFFY_ENV', 'dev').lower()
                         customer = Customer(
                             id=customer_id,
                             name=customer_name,
-                            stack=stack
+                            stack=stack,
+                            created_from_env=current_env
                         )
                         db.add(customer)
                         db.commit()
-                        print(f"✅ Created customer record: {customer_name} ({customer_id})")
+                        print(f"✅ Created customer record: {customer_name} ({customer_id}) [created_from_env={current_env}]")
                     else:
                         print(f"ℹ️  Customer record already exists: {customer_name} ({customer_id})")
                 except Exception as db_error:
@@ -1540,17 +1577,38 @@ async def delete_customer(customer_id: str, request: Request, db: Session = Depe
         
     except Exception as e:
         return JSONResponse(status_code=500, content={'error': str(e)})
-@app.get("/deployments")
+@app.get("/api/deployments")
 def get_deployments():
-    """Get deployments for current environment only (environment isolation)"""
+    """Get deployments with control plane / customer separation
+    
+    Returns two separate arrays:
+    - control_plane: OpenLuffy infrastructure (openluffy-{current_env} only)
+    - customers: Customer workloads (all envs for customers created from current_env)
+    """
     if not k8s_available:
-        return {'error': 'K8s not available', 'deployments': [], 'total': 0}
+        return {'error': 'K8s not available', 'control_plane': [], 'customers': [], 'total': 0}
     
     # Get current OpenLuffy environment (dev, preprod, or prod)
     current_env = os.getenv('OPENLUFFY_ENV', 'dev').lower()
-    print(f"ℹ️  Filtering deployments for environment: {current_env}")
+    print(f"ℹ️  Filtering for current environment: {current_env}")
     
-    deployments = []
+    # Get list of customers created from this environment
+    customers_from_this_env = set()
+    if db_available:
+        try:
+            from database import SessionLocal
+            db = SessionLocal()
+            try:
+                customers = db.query(Customer).filter(Customer.created_from_env == current_env).all()
+                customers_from_this_env = {c.id for c in customers}
+                print(f"ℹ️  Found {len(customers_from_this_env)} customers created from {current_env}: {customers_from_this_env}")
+            finally:
+                db.close()
+        except Exception as e:
+            print(f"⚠️  Failed to query customers: {e}")
+    
+    control_plane = []
+    customer_deployments = []
     
     # Discover all customer namespaces dynamically
     try:
@@ -1590,9 +1648,13 @@ def get_deployments():
                     env = 'prod'
             
             if customer_id and env:
-                # Environment isolation: only show deployments for current environment
-                if env != current_env:
-                    continue  # Skip namespaces from other environments
+                # Separate control plane from customer workloads
+                is_control_plane = (customer_id == 'Openluffy')
+                
+                if not is_control_plane:
+                    # Customer namespace - only show if customer was created from this env
+                    if customer_id not in customers_from_this_env:
+                        continue  # Skip customers created from other environments
                 
                 # Get deployments from this namespace
                 try:
@@ -1603,7 +1665,7 @@ def get_deployments():
                         replicas = deploy.status.replicas or 0
                         ready = deploy.status.ready_replicas or 0
                         
-                        deployments.append({
+                        deployment_data = {
                             'id': f"{ns_name}-{name}",
                             'name': name,
                             'namespace': ns_name,
@@ -1613,7 +1675,13 @@ def get_deployments():
                             'ready': ready,
                             'status': 'running' if ready == replicas and ready > 0 else 'degraded',
                             'image': deploy.spec.template.spec.containers[0].image
-                        })
+                        }
+                        
+                        if is_control_plane:
+                            control_plane.append(deployment_data)
+                        else:
+                            customer_deployments.append(deployment_data)
+                            
                 except ApiException as e:
                     # Namespace exists but no deployments or access denied
                     pass
@@ -1621,7 +1689,14 @@ def get_deployments():
     except Exception as e:
         print(f"Error discovering deployments: {e}")
     
-    return {'deployments': deployments, 'total': len(deployments)}
+    total = len(control_plane) + len(customer_deployments)
+    print(f"ℹ️  Returning {len(control_plane)} control plane + {len(customer_deployments)} customer deployments = {total} total")
+    
+    return {
+        'control_plane': control_plane,
+        'customers': customer_deployments,
+        'total': total
+    }
 
 # Integration models
 class IntegrationConfig(BaseModel):

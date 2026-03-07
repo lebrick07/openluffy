@@ -4,9 +4,9 @@ import { useCustomer } from '../contexts/CustomerContext'
 import './ApplicationsTable.css'
 
 function ApplicationsTable({ selectedEnvironment }) {
-  const { activeCustomer } = useCustomer()
+  const { activeCustomer, selectedCustomer } = useCustomer()
   const navigate = useNavigate()
-  const [deployments, setDeployments] = useState([])
+  const [deployments, setDeployments] = useState({ control_plane: [], customers: [] })
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -26,10 +26,23 @@ function ApplicationsTable({ selectedEnvironment }) {
       const deploymentsData = await deploymentsRes.json()
       const customersData = await customersRes.json()
       
-      setDeployments(deploymentsData.deployments || [])
+      console.log('📊 Deployments data:', deploymentsData)
+      console.log('👥 Customers data:', customersData)
+      
+      // New response structure: { control_plane: [...], customers: [...] }
+      const allDeployments = {
+        control_plane: deploymentsData.control_plane || [],
+        customers: deploymentsData.customers || []
+      }
+      
+      console.log('🎯 Setting deployments:', allDeployments)
+      console.log('  - Control plane:', allDeployments.control_plane.length, 'pods')
+      console.log('  - Customers:', allDeployments.customers.length, 'pods')
+      
+      setDeployments(allDeployments)
       setCustomers(customersData.customers || [])
     } catch (error) {
-      console.error('Error fetching data:', error)
+      console.error('❌ Error fetching data:', error)
     } finally {
       setLoading(false)
     }
@@ -193,12 +206,32 @@ function ApplicationsTable({ selectedEnvironment }) {
     }
   }
 
+  // Determine if we're showing control plane or customer workloads
+  const isControlPlaneView = selectedCustomer === 'control-plane'
+  
+  console.log('🔍 View state:', {
+    selectedCustomer,
+    isControlPlaneView,
+    selectedEnvironment,
+    activeCustomer: activeCustomer?.id
+  })
+  
+  // Get deployments based on view
+  const currentDeployments = isControlPlaneView
+    ? (deployments.control_plane || [])
+    : (deployments.customers || [])
+
+  console.log('📦 Current deployments for view:', currentDeployments.length, 'items')
+
   // Filter deployments
-  const filtered = deployments.filter(d => {
-    if (activeCustomer && d.customer !== activeCustomer.id) return false
+  const filtered = currentDeployments.filter(d => {
+    // In control plane view, don't filter by customer
+    if (!isControlPlaneView && activeCustomer && d.customer !== activeCustomer.id) return false
     if (selectedEnvironment !== 'all' && d.environment !== selectedEnvironment) return false
     return true
   })
+  
+  console.log('✅ Filtered deployments:', filtered.length, 'items')
 
   if (loading) {
     return <div className="applications-table-loading">Loading applications...</div>
@@ -208,14 +241,16 @@ function ApplicationsTable({ selectedEnvironment }) {
     <div className="applications-table-container">
       <div className="table-header-bar">
         <h2>Applications</h2>
-        <span className="table-count">{filtered.length} deployments</span>
+        <div className="table-controls">
+          <span className="table-count">{filtered.length} deployments</span>
+        </div>
       </div>
 
       <table className="applications-table">
         <thead>
           <tr>
-            <th>Customer</th>
-            <th>Application</th>
+            {!isControlPlaneView && <th>Customer</th>}
+            <th>{isControlPlaneView ? 'Component' : 'Application'}</th>
             <th>Environment</th>
             <th>Status</th>
             <th>Pods</th>
@@ -228,10 +263,12 @@ function ApplicationsTable({ selectedEnvironment }) {
         <tbody>
           {filtered.length === 0 ? (
             <tr>
-              <td colSpan="9" className="no-data">
-                {!activeCustomer 
-                  ? '👤 Select a customer from the dropdown to view their applications'
-                  : `No applications found for ${activeCustomer.name}${selectedEnvironment !== 'all' ? ` in ${selectedEnvironment} environment` : ''}`
+              <td colSpan={isControlPlaneView ? 8 : 9} className="no-data">
+                {isControlPlaneView
+                  ? 'No control plane deployments found'
+                  : !activeCustomer 
+                    ? '👤 Select a customer from the dropdown to view their applications'
+                    : `No applications found for ${activeCustomer.name}${selectedEnvironment !== 'all' ? ` in ${selectedEnvironment} environment` : ''}`
                 }
               </td>
             </tr>
@@ -243,9 +280,11 @@ function ApplicationsTable({ selectedEnvironment }) {
                 className="table-row"
                 style={{ cursor: 'pointer' }}
               >
-                <td className="cell-customer">
-                  <span className="customer-name">{getCustomerName(deployment.customer)}</span>
-                </td>
+                {!isControlPlaneView && (
+                  <td className="cell-customer">
+                    <span className="customer-name">{getCustomerName(deployment.customer)}</span>
+                  </td>
+                )}
                 <td className="cell-app">
                   <span className="app-name">{deployment.name}</span>
                 </td>

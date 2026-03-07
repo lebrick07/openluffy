@@ -58,10 +58,11 @@ function TopNavbar({ onCreateNew, selectedEnvironment, onEnvironmentChange, onTo
         <div className="navbar-filters">
           <select 
             className="filter-select"
-            value={selectedCustomer || 'all'}
-            onChange={(e) => selectCustomer(e.target.value === 'all' ? null : e.target.value)}
+            value={selectedCustomer || 'control-plane'}
+            onChange={(e) => selectCustomer(e.target.value)}
           >
-            <option value="all">All Customers</option>
+            <option value="control-plane">🎛️ Control Plane</option>
+            <option disabled>──────────────</option>
             {customers.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
