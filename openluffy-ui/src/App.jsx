@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import './App.css'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { CustomerProvider, useCustomer } from './contexts/CustomerContext'
 import TopNavbar from './components/TopNavbar'
 import Sidebar from './components/Sidebar'
@@ -14,6 +15,7 @@ import AIChatPanel from './components/AIChatPanel'
 import SettingsPage from './components/SettingsPage'
 import ErrorBoundary from './components/ErrorBoundary'
 import Login from './components/Login'
+import CustomerApplicationDetail from './components/CustomerApplicationDetail'
 import { isAuthenticated, getCurrentUser } from './utils/auth'
 
 function AppContent() {
@@ -268,7 +270,26 @@ function App() {
   return (
     <ErrorBoundary>
       <CustomerProvider>
-        <AppContent />
+        <BrowserRouter>
+          <Routes>
+            {/* Main app route */}
+            <Route path="/" element={<AppContent />} />
+            
+            {/* Application detail page route */}
+            <Route 
+              path="/customers/:customerId/:environment" 
+              element={
+                <div className="app-container">
+                  <TopNavbar currentUser={authenticated ? getCurrentUser() : null} />
+                  <CustomerApplicationDetail />
+                </div>
+              } 
+            />
+            
+            {/* Catch-all redirect */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
       </CustomerProvider>
     </ErrorBoundary>
   )

@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useCustomer } from '../contexts/CustomerContext'
 import './ApplicationsTable.css'
-import DeploymentDetails from './DeploymentDetails'
 
 function ApplicationsTable({ selectedEnvironment }) {
   const { activeCustomer } = useCustomer()
+  const navigate = useNavigate()
   const [deployments, setDeployments] = useState([])
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selectedDeployment, setSelectedDeployment] = useState(null)
 
   useEffect(() => {
     fetchData()
@@ -239,8 +239,9 @@ function ApplicationsTable({ selectedEnvironment }) {
             filtered.map(deployment => (
               <tr 
                 key={deployment.id}
-                onClick={() => setSelectedDeployment(deployment.id)}
+                onClick={() => navigate(`/customers/${deployment.customer}/${deployment.environment}`)}
                 className="table-row"
+                style={{ cursor: 'pointer' }}
               >
                 <td className="cell-customer">
                   <span className="customer-name">{getCustomerName(deployment.customer)}</span>
@@ -281,7 +282,7 @@ function ApplicationsTable({ selectedEnvironment }) {
                 <td className="cell-actions" onClick={(e) => e.stopPropagation()}>
                   <button 
                     className="action-btn action-view" 
-                    onClick={() => setSelectedDeployment(deployment.id)}
+                    onClick={() => navigate(`/customers/${deployment.customer}/${deployment.environment}`)}
                     title="View Details"
                   >
                     View
@@ -318,13 +319,6 @@ function ApplicationsTable({ selectedEnvironment }) {
           )}
         </tbody>
       </table>
-
-      {selectedDeployment && (
-        <DeploymentDetails 
-          deploymentId={selectedDeployment}
-          onClose={() => setSelectedDeployment(null)}
-        />
-      )}
     </div>
   )
 }
