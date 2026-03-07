@@ -1,0 +1,22 @@
+v1.1.0
+
+## Release Notes
+
+### v1.1.0 (2026-03-07)
+- Control plane default view on page load
+- Dark theme application detail page
+- Customer dropdown UX improvements
+- Environment isolation with created_from_env column
+- Backend /api prefix routing
+- ARM64 build optimization
+- Nginx routing fixes
+- Migration system implementation
+- Workflow guards to prevent spurious failures
+
+### v1.0.0 (2026-03-04)
+- Initial K3s deployment
+- Multi-tenant architecture
+- ArgoCD GitOps integration
+- GitHub Actions CI/CD
+- Secrets management
+- Backup/restore automation
