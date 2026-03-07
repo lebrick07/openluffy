@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useCustomer } from '../contexts/CustomerContext'
 import './ApplicationsTable.css'
-import DeploymentDetails from './DeploymentDetails'
 
 function ApplicationsTable({ selectedEnvironment }) {
   const { activeCustomer } = useCustomer()
+  const navigate = useNavigate()
   const [deployments, setDeployments] = useState([])
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selectedDeployment, setSelectedDeployment] = useState(null)
 
   useEffect(() => {
     fetchData()
@@ -63,17 +63,133 @@ function ApplicationsTable({ selectedEnvironment }) {
     return `${Math.floor(minutes / 1440)}d ago`
   }
 
-  const handleDeploy = (deployment, e) => {
+  const handleDeploy = async (deployment, e) => {
     e.stopPropagation()
-    console.log('Deploy:', deployment)
-    alert(`Deploy ${deployment.name} - Backend API coming soon`)
+    
+    if (!confirm(`Deploy latest version of ${deployment.name}?`)) return
+    
+    setLoading(true)
+    try {
+      const response = await fetch(
+        `/api/v1/deployments/${deployment.id}/deploy`,
+        { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ revision: 'HEAD' })
+        }
+      )
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'Deploy failed')
+      }
+      
+      const result = await response.json()
+      alert(`✓ ${result.message}`)
+      fetchData() // Refresh table
+    } catch (error) {
+      alert(`✗ Deploy failed: ${error.message}`)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleRollback = (deployment, e) => {
+  const handleRollback = async (deployment, e) => {
     e.stopPropagation()
-    if (confirm(`Rollback ${deployment.name}?`)) {
-      console.log('Rollback:', deployment)
-      alert('Rollback - Backend API coming soon')
+    
+    if (!confirm(`Rollback ${deployment.name} to previous version?`)) return
+    
+    setLoading(true)
+    try {
+      const response = await fetch(
+        `/api/v1/deployments/${deployment.id}/rollback`,
+        { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to_revision: 'previous' })
+        }
+      )
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'Rollback failed')
+      }
+      
+      const result = await response.json()
+      alert(`✓ ${result.message}`)
+      fetchData()
+    } catch (error) {
+      alert(`✗ Rollback failed: ${error.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleScale = async (deployment, e) => {
+    e.stopPropagation()
+    
+    const replicas = prompt('How many replicas? (0-20)', deployment.replicas || 1)
+    if (!replicas || isNaN(replicas)) return
+    
+    const replicasNum = parseInt(replicas)
+    if (replicasNum < 0 || replicasNum > 20) {
+      alert('Replicas must be between 0 and 20')
+      return
+    }
+    
+    setLoading(true)
+    try {
+      const response = await fetch(
+        `/api/v1/deployments/${deployment.id}/scale`,
+        { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ replicas: replicasNum })
+        }
+      )
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'Scale failed')
+      }
+      
+      const result = await response.json()
+      alert(`✓ ${result.message}`)
+      fetchData()
+    } catch (error) {
+      alert(`✗ Scale failed: ${error.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRestart = async (deployment, e) => {
+    e.stopPropagation()
+    
+    if (!confirm(`Restart all pods for ${deployment.name}?`)) return
+    
+    setLoading(true)
+    try {
+      const response = await fetch(
+        `/api/v1/deployments/${deployment.id}/restart`,
+        { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      )
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'Restart failed')
+      }
+      
+      const result = await response.json()
+      alert(`✓ ${result.message}`)
+      fetchData()
+    } catch (error) {
+      alert(`✗ Restart failed: ${error.message}`)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -123,8 +239,9 @@ function ApplicationsTable({ selectedEnvironment }) {
             filtered.map(deployment => (
               <tr 
                 key={deployment.id}
-                onClick={() => setSelectedDeployment(deployment.id)}
+                onClick={() => navigate(`/customers/${deployment.customer}/${deployment.environment}`)}
                 className="table-row"
+                style={{ cursor: 'pointer' }}
               >
                 <td className="cell-customer">
                   <span className="customer-name">{getCustomerName(deployment.customer)}</span>
@@ -165,7 +282,7 @@ function ApplicationsTable({ selectedEnvironment }) {
                 <td className="cell-actions" onClick={(e) => e.stopPropagation()}>
                   <button 
                     className="action-btn action-view" 
-                    onClick={() => setSelectedDeployment(deployment.id)}
+                    onClick={() => navigate(`/customers/${deployment.customer}/${deployment.environment}`)}
                     title="View Details"
                   >
                     View
@@ -188,7 +305,9 @@ function ApplicationsTable({ selectedEnvironment }) {
                     className="action-btn action-more"
                     onClick={(e) => {
                       e.stopPropagation()
-                      alert('More actions - Backend API coming soon')
+                      const action = prompt('Choose action:\n1. Scale\n2. Restart\n3. Cancel', '1')
+                      if (action === '1') handleScale(deployment, e)
+                      else if (action === '2') handleRestart(deployment, e)
                     }}
                     title="More Actions"
                   >
@@ -200,13 +319,6 @@ function ApplicationsTable({ selectedEnvironment }) {
           )}
         </tbody>
       </table>
-
-      {selectedDeployment && (
-        <DeploymentDetails 
-          deploymentId={selectedDeployment}
-          onClose={() => setSelectedDeployment(null)}
-        />
-      )}
     </div>
   )
 }
