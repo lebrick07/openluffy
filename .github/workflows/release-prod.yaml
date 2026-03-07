@@ -23,20 +23,23 @@ jobs:
       packages: write
     outputs:
       dev_sha: ${{ steps.find-sha.outputs.dev_sha }}
+      main_sha: ${{ steps.find-sha.outputs.main_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Find dev SHA
+      - name: Find dev SHA from deployed images
         id: find-sha
         run: |
-          DEV_SHA=$(git log --merges -1 --pretty=format:%P | awk '{print $2}')
-          [ -z "$DEV_SHA" ] && DEV_SHA=${{ github.sha }}
-          SHORT_DEV_SHA=$(echo $DEV_SHA | cut -c1-7)
-          SHORT_MAIN_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          echo "dev_sha=$SHORT_DEV_SHA" >> $GITHUB_OUTPUT
-          echo "main_sha=$SHORT_MAIN_SHA" >> $GITHUB_OUTPUT
+          # Extract the actual dev tag from values file (what's deployed in dev/preprod)
+          DEV_TAG=$(grep -A 3 "backend:" helm/openluffy/values/dev.yaml | grep "tag:" | awk '{print $2}' | cut -d'#' -f1 | tr -d ' ')
+          DEV_SHA=$(echo $DEV_TAG | sed 's/dev-//')
+          MAIN_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          
+          echo "dev_sha=$DEV_SHA" >> $GITHUB_OUTPUT
+          echo "main_sha=$MAIN_SHA" >> $GITHUB_OUTPUT
+          echo "✅ Will promote: dev-$DEV_SHA → prod-$MAIN_SHA"
 
       - name: Log in to Registry
         uses: docker/login-action@v3
@@ -51,11 +54,15 @@ jobs:
           PROD_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:prod-${{ steps.find-sha.outputs.main_sha }}"
           LATEST_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest"
           
+          echo "Pulling: $DEV_TAG"
           docker pull $DEV_TAG
+          echo "Tagging as: $PROD_TAG"
           docker tag $DEV_TAG $PROD_TAG
           docker tag $DEV_TAG $LATEST_TAG
+          echo "Pushing: $PROD_TAG"
           docker push $PROD_TAG
           docker push $LATEST_TAG
+          echo "✅ Backend promoted successfully"
 
   # Stage 2: Scan Backend
   scan-backend:
@@ -66,7 +73,7 @@ jobs:
       - name: Run Trivy scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:prod-${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:prod-${{ needs.promote-backend.outputs.main_sha }}
           format: 'sarif'
           output: 'trivy-backend.sarif'
           severity: 'CRITICAL,HIGH'
@@ -86,18 +93,18 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Find dev SHA
+      - name: Find dev SHA from deployed images
         id: find-sha
         run: |
-          DEV_SHA=$(git log --merges -1 --pretty=format:%P | awk '{print $2}')
-          [ -z "$DEV_SHA" ] && DEV_SHA=${{ github.sha }}
-          SHORT_DEV_SHA=$(echo $DEV_SHA | cut -c1-7)
-          SHORT_MAIN_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          echo "dev_sha=$SHORT_DEV_SHA" >> $GITHUB_OUTPUT
-          echo "main_sha=$SHORT_MAIN_SHA" >> $GITHUB_OUTPUT
+          # Extract the actual dev tag from values file (what's deployed in dev/preprod)
+          DEV_TAG=$(grep -A 3 "frontend:" helm/openluffy/values/dev.yaml | grep "tag:" | awk '{print $2}' | cut -d'#' -f1 | tr -d ' ')
+          DEV_SHA=$(echo $DEV_TAG | sed 's/dev-//')
+          MAIN_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          
+          echo "dev_sha=$DEV_SHA" >> $GITHUB_OUTPUT
+          echo "main_sha=$MAIN_SHA" >> $GITHUB_OUTPUT
+          echo "✅ Will promote: dev-$DEV_SHA → prod-$MAIN_SHA"
 
       - name: Log in to Registry
         uses: docker/login-action@v3
@@ -112,11 +119,15 @@ jobs:
           PROD_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:prod-${{ steps.find-sha.outputs.main_sha }}"
           LATEST_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest"
           
+          echo "Pulling: $DEV_TAG"
           docker pull $DEV_TAG
+          echo "Tagging as: $PROD_TAG"
           docker tag $DEV_TAG $PROD_TAG
           docker tag $DEV_TAG $LATEST_TAG
+          echo "Pushing: $PROD_TAG"
           docker push $PROD_TAG
           docker push $LATEST_TAG
+          echo "✅ Frontend promoted successfully"
 
   # Stage 4: Scan Frontend
   scan-frontend:
@@ -127,7 +138,7 @@ jobs:
       - name: Run Trivy scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:prod-${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:prod-${{ needs.promote-backend.outputs.main_sha }}
           format: 'sarif'
           output: 'trivy-frontend.sarif'
           severity: 'CRITICAL,HIGH'
@@ -142,7 +153,7 @@ jobs:
   deploy-prod:
     name: Deploy to Production
     runs-on: openluffy-runner
-    needs: [scan-backend, scan-frontend]
+    needs: [scan-backend, scan-frontend, promote-backend]
     permissions:
       contents: write
     steps:
@@ -150,17 +161,18 @@ jobs:
 
       - name: Update prod manifests
         run: |
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          sed -i "s|tag:.*# backend|tag: prod-${SHORT_SHA} # backend|g" helm/openluffy/values/prod.yaml
-          sed -i "s|tag:.*# frontend|tag: prod-${SHORT_SHA} # frontend|g" helm/openluffy/values/prod.yaml
+          PROD_SHA=${{ needs.promote-backend.outputs.main_sha }}
+          sed -i "s|tag:.*# backend|tag: prod-${PROD_SHA} # backend|g" helm/openluffy/values/prod.yaml
+          sed -i "s|tag:.*# frontend|tag: prod-${PROD_SHA} # frontend|g" helm/openluffy/values/prod.yaml
+          echo "✅ Updated prod values to prod-${PROD_SHA}"
 
       - name: Commit manifests
         run: |
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'actions@github.com'
           git add helm/openluffy/values/prod.yaml
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          git commit -m "chore(prod): deploy prod-${SHORT_SHA} [skip ci]" || echo "No changes"
+          PROD_SHA=${{ needs.promote-backend.outputs.main_sha }}
+          git commit -m "chore(prod): deploy prod-${PROD_SHA} [skip ci]" || echo "No changes"
           git pull --rebase origin main || true
           git push
 
@@ -183,3 +195,4 @@ jobs:
                   - name: secrets.githubToken
                     value: "${{ secrets.GH_PAT }}"
           '
+          echo "✅ Secrets injected into ArgoCD"
