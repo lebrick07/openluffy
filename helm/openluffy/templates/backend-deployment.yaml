@@ -55,6 +55,11 @@ spec:
               value: "main"
             - name: OPENCLAW_TOKEN
               value: ""
+            - name: INITIAL_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-api-keys
+                  key: initial-admin-password
             - name: ANTHROPIC_API_KEY
               valueFrom:
                 secretKeyRef:
