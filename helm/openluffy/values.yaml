@@ -77,4 +77,9 @@ secrets:
   # Optional: If not set, will fall back to Claude or disable AI features
   openaiApiKey: ""
   
+  # initialAdminPassword for default admin user creation
+  # Used when the database is empty and no users exist
+  # Default: "Admin123!" (can be overridden per environment)
+  initialAdminPassword: "Admin123!"
+  
   githubOrg: "lebrick07"  # Default GitHub organization

@@ -217,7 +217,7 @@ def create_default_admin(db):
     """
     Create default admin user if database is empty
     Username: admin
-    Password: from ADMIN_PASSWORD env var or auto-generated
+    Password: from INITIAL_ADMIN_PASSWORD or ADMIN_PASSWORD env var or auto-generated
     """
     from database import User
     from auth_utils import hash_password
@@ -230,12 +230,15 @@ def create_default_admin(db):
         print("ℹ️ Users already exist, skipping default admin creation")
         return
     
-    # Get password from environment or generate random one
-    admin_password = os.getenv('ADMIN_PASSWORD', None)
+    # Get password from environment (prefer INITIAL_ADMIN_PASSWORD, fallback to ADMIN_PASSWORD)
+    admin_password = os.getenv('INITIAL_ADMIN_PASSWORD') or os.getenv('ADMIN_PASSWORD')
+    password_source = "env var"
+    
     if not admin_password:
         admin_password = secrets.token_urlsafe(16)
+        password_source = "generated"
         print(f"🔐 Generated random admin password: {admin_password}")
-        print("⚠️ SAVE THIS PASSWORD! Set ADMIN_PASSWORD env var to use a custom password.")
+        print("⚠️ SAVE THIS PASSWORD! Set INITIAL_ADMIN_PASSWORD env var to use a custom password.")
     
     # Create default admin user
     admin = User(
@@ -253,8 +256,8 @@ def create_default_admin(db):
     db.add(admin)
     db.commit()
     
-    print(f"✅ Default admin user created: username='admin'")
-    if not os.getenv('ADMIN_PASSWORD'):
+    print(f"✅ Default admin user created: username='admin' (password from {password_source})")
+    if password_source == "generated":
         print(f"🔑 Login with: username=admin, password={admin_password}")
 
 
