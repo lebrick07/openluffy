@@ -18,6 +18,44 @@ import Login from './components/Login'
 import CustomerApplicationDetail from './components/CustomerApplicationDetail'
 import { isAuthenticated, getCurrentUser } from './utils/auth'
 
+// Detail page with sidebar
+function AppContentWithDetail() {
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [selectedEnvironment, setSelectedEnvironment] = useState('all')
+
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen)
+  }
+
+  const closeSidebar = () => {
+    setSidebarOpen(false)
+  }
+
+  return (
+    <div className="app operator-grade">
+      <TopNavbar 
+        selectedEnvironment={selectedEnvironment}
+        onEnvironmentChange={setSelectedEnvironment}
+        onToggleSidebar={toggleSidebar}
+      />
+      <div className="app-body">
+        <Sidebar 
+          activeView="applications" 
+          onViewChange={closeSidebar}
+          isOpen={sidebarOpen}
+        />
+        {sidebarOpen && <div className="sidebar-overlay" onClick={closeSidebar}></div>}
+        
+        <main className="app-main" style={{ width: '100%' }}>
+          <div className="app-content">
+            <CustomerApplicationDetail />
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
+
 function AppContent() {
   const { refreshCustomers } = useCustomer()
   const [activeView, setActiveView] = useState('applications')
@@ -278,12 +316,7 @@ function App() {
             {/* Application detail page route */}
             <Route 
               path="/customers/:customerId/:environment" 
-              element={
-                <div className="app-container">
-                  <TopNavbar currentUser={authenticated ? getCurrentUser() : null} />
-                  <CustomerApplicationDetail />
-                </div>
-              } 
+              element={<AppContentWithDetail />} 
             />
             
             {/* Catch-all redirect */}

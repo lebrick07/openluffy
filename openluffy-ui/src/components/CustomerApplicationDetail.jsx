@@ -209,6 +209,18 @@ function CustomerApplicationDetail() {
           Overview
         </button>
         <button 
+          className={activeTab === 'resources' ? 'tab active' : 'tab'}
+          onClick={() => setActiveTab('resources')}
+        >
+          Resources
+        </button>
+        <button 
+          className={activeTab === 'networking' ? 'tab active' : 'tab'}
+          onClick={() => setActiveTab('networking')}
+        >
+          Networking
+        </button>
+        <button 
           className={activeTab === 'pods' ? 'tab active' : 'tab'}
           onClick={() => setActiveTab('pods')}
         >
@@ -346,6 +358,149 @@ function CustomerApplicationDetail() {
           </div>
         )}
         
+        {activeTab === 'resources' && (
+          <div className="resources-tab">
+            {/* Resource Specifications */}
+            <div className="detail-card">
+              <h3>🎯 Resource Specifications</h3>
+              <div className="config-grid">
+                <div className="config-item">
+                  <span className="config-label">CPU Request:</span>
+                  <span className="config-value">{deployment.resources?.cpu_request || 'Not set'}</span>
+                </div>
+                <div className="config-item">
+                  <span className="config-label">CPU Limit:</span>
+                  <span className="config-value">{deployment.resources?.cpu_limit || 'Not set'}</span>
+                </div>
+                <div className="config-item">
+                  <span className="config-label">Memory Request:</span>
+                  <span className="config-value">{deployment.resources?.memory_request || 'Not set'}</span>
+                </div>
+                <div className="config-item">
+                  <span className="config-label">Memory Limit:</span>
+                  <span className="config-value">{deployment.resources?.memory_limit || 'Not set'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Deployment Strategy */}
+            <div className="detail-card">
+              <h3>🚀 Deployment Strategy</h3>
+              <div className="config-grid">
+                <div className="config-item">
+                  <span className="config-label">Strategy:</span>
+                  <span className="config-value">{deployment.deployment?.strategy || 'RollingUpdate'}</span>
+                </div>
+                <div className="config-item">
+                  <span className="config-label">Max Surge:</span>
+                  <span className="config-value">{deployment.deployment?.max_surge || '25%'}</span>
+                </div>
+                <div className="config-item">
+                  <span className="config-label">Max Unavailable:</span>
+                  <span className="config-value">{deployment.deployment?.max_unavailable || '25%'}</span>
+                </div>
+                <div className="config-item">
+                  <span className="config-label">Revision:</span>
+                  <span className="config-value">{deployment.deployment?.revision || 'N/A'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Image Details */}
+            <div className="detail-card">
+              <h3>📦 Container Image</h3>
+              <div className="image-details">
+                <div className="image-row">
+                  <span className="image-label">Image:</span>
+                  <code className="image-value">{deployment.image || 'Unknown'}</code>
+                  <button className="copy-btn" onClick={() => navigator.clipboard.writeText(deployment.image || '')}>
+                    📋 Copy
+                  </button>
+                </div>
+                <div className="image-row">
+                  <span className="image-label">Registry:</span>
+                  <span className="image-value">{deployment.image?.split('/')[0] || 'Unknown'}</span>
+                </div>
+                <div className="image-row">
+                  <span className="image-label">Pull Policy:</span>
+                  <span className="image-value">{deployment.image_pull_policy || 'IfNotPresent'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'networking' && (
+          <div className="networking-tab">
+            {/* How to Connect */}
+            <div className="detail-card">
+              <h3>🔌 How to Connect</h3>
+              <div className="connect-section">
+                <div className="connect-method">
+                  <h4>Port Forward (kubectl)</h4>
+                  <div className="code-block">
+                    <code>kubectl port-forward -n openluffy-{environment} deployment/{customerId}-{environment} 8080:8080</code>
+                    <button className="copy-btn" onClick={() => navigator.clipboard.writeText(`kubectl port-forward -n openluffy-${environment} deployment/${customerId}-${environment} 8080:8080`)}>
+                      📋
+                    </button>
+                  </div>
+                  <p className="connect-hint">Then access: <code>http://localhost:8080</code></p>
+                </div>
+
+                <div className="connect-method">
+                  <h4>Internal Service (ClusterIP)</h4>
+                  <div className="code-block">
+                    <code>{customerId}-{environment}.openluffy-{environment}.svc.cluster.local</code>
+                    <button className="copy-btn" onClick={() => navigator.clipboard.writeText(`${customerId}-${environment}.openluffy-${environment}.svc.cluster.local`)}>
+                      📋
+                    </button>
+                  </div>
+                  <p className="connect-hint">Accessible from within the cluster</p>
+                </div>
+
+                <div className="connect-method">
+                  <h4>Execute Shell in Pod</h4>
+                  <div className="code-block">
+                    <code>kubectl exec -n openluffy-{environment} -it deployment/{customerId}-{environment} -- /bin/sh</code>
+                    <button className="copy-btn" onClick={() => navigator.clipboard.writeText(`kubectl exec -n openluffy-${environment} -it deployment/${customerId}-${environment} -- /bin/sh`)}>
+                      📋
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Service Info */}
+            <div className="detail-card">
+              <h3>🌐 Service</h3>
+              <div className="config-grid">
+                <div className="config-item">
+                  <span className="config-label">Service Name:</span>
+                  <span className="config-value"><code>{customerId}-{environment}</code></span>
+                </div>
+                <div className="config-item">
+                  <span className="config-label">Namespace:</span>
+                  <span className="config-value"><code>openluffy-{environment}</code></span>
+                </div>
+                <div className="config-item">
+                  <span className="config-label">Type:</span>
+                  <span className="config-value">{deployment.service?.type || 'ClusterIP'}</span>
+                </div>
+                <div className="config-item">
+                  <span className="config-label">Ports:</span>
+                  <span className="config-value">{deployment.service?.ports || '8080 → 8080'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Network Policies (Placeholder) */}
+            <div className="detail-card">
+              <h3>🔒 Network Policies</h3>
+              <p className="placeholder-text">Network policies will appear here when configured</p>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'events' && (
           <div className="events-tab">
             <div className="detail-card">

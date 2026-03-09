@@ -284,3 +284,50 @@ A DevOps engineer should be able to:
 ---
 
 **This is how one DevOps engineer manages 5-10 customers at scale.**
+
+---
+
+## Chatbot Parity Requirement
+
+**Core Principle:** Whatever the UI can do, Luffy chatbot MUST be able to do.
+
+**See:** [CHATBOT-PARITY.md](CHATBOT-PARITY.md) for full requirements.
+
+### Application Management
+
+When we add features to the UI (scale, restart, rollback, view details), Luffy must support the same via natural language:
+
+```
+UI: Click "Scale" → Set replicas to 5
+Chatbot: "scale acme-corp-dev to 5 replicas"
+
+UI: Click "Resources" tab → View CPU/Memory
+Chatbot: "what are the resource limits for customer-api-prod?"
+
+UI: Click "Networking" tab → See connection commands
+Chatbot: "how do I connect to acme-corp-preprod?"
+```
+
+### Development Workflow
+
+**When adding a new UI feature:**
+
+1. ✅ Build UI component
+2. ✅ Create backend API endpoint
+3. ⚠️ **REQUIRED:** Implement chatbot tool function
+4. ⚠️ **REQUIRED:** Add natural language variations
+5. ⚠️ **REQUIRED:** Update chatbot tests
+6. ⚠️ **REQUIRED:** Document chatbot commands
+
+**Incomplete without chatbot parity.**
+
+### Tracking
+
+All UI features MUST have corresponding GitHub issues tagged with `chatbot-parity` label.
+
+**Project Board:** [OpenLuffy Development](https://github.com/lebrick07/openluffy/projects)  
+**Roadmap:** [ROADMAP.md](../ROADMAP.md)
+
+---
+
+**Updated:** 2026-03-09
