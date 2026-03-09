@@ -392,12 +392,34 @@
 }
 
 @media (max-width: 768px) {
+  .navbar-left {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
   .navbar-filters {
-    display: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    width: 100%;
+  }
+
+  .filter-select {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    min-width: 100px;
+    flex: 1;
   }
 
   .navbar-center {
-    min-width: 200px;
+    min-width: 150px;
+    flex: 1;
+  }
+
+  .navbar-search {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
   }
 }
 
