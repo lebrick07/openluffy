@@ -247,3 +247,29 @@ npm run test:unit
 ## Questions?
 
 Read the docs or ask in Discord: https://discord.com/invite/clawd
+
+---
+
+## Git Hooks (Recommended)
+
+To prevent accidentally committing directly to `develop` or `main`, install the pre-commit hook:
+
+```bash
+./scripts/install-git-hooks.sh
+```
+
+This will block commits to protected branches and remind you to use feature branches.
+
+**What it does:**
+- Prevents `git commit` on `develop` or `main` branches
+- Shows error message with correct workflow
+- Ensures you always work on feature branches
+
+**Manual installation:**
+```bash
+cp scripts/install-git-hooks.sh .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
+**Note:** Git hooks are local and not tracked by git. Each developer should run this after cloning the repository.
+
