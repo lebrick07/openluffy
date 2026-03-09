@@ -10,13 +10,14 @@ Base = declarative_base()
 
 
 class Customer(Base):
-    """Customer entity"""
+    """Customer entity (renamed to Project in v1.2 for clarity)"""
     __tablename__ = 'customers'
     
-    id = Column(String(100), primary_key=True)  # customer-id (slug)
+    id = Column(String(100), primary_key=True)  # customer-id (slug) / project-id
     name = Column(String(200), nullable=False)  # Display name
-    stack = Column(String(50), nullable=False)  # nodejs, python, go
+    stack = Column(String(50), nullable=False)  # nodejs, python, go, platform
     github_repo = Column(String(200))  # org/repo
+    project_type = Column(String(50), default='customer-project', nullable=False)  # control-plane or customer-project
     created_from_env = Column(String(20), default='dev', nullable=False)  # Which OpenLuffy env created this customer
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -31,6 +32,7 @@ class Customer(Base):
             'name': self.name,
             'stack': self.stack,
             'github_repo': self.github_repo,
+            'project_type': self.project_type,
             'created_from_env': self.created_from_env,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
