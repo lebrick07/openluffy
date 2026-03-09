@@ -5,7 +5,7 @@ environment: prod
 backend:
   image:
     repository: ghcr.io/lebrick07/openluffy-backend
-    tag: main-5ad3d62 # backend
+    tag: dev-7e897b1 # backend
     pullPolicy: IfNotPresent
   replicas: 1
   service:
@@ -15,7 +15,7 @@ backend:
 frontend:
   image:
     repository: ghcr.io/lebrick07/openluffy-frontend
-    tag: main-5ad3d62 # frontend
+    tag: dev-7e897b1 # frontend
     pullPolicy: IfNotPresent
   replicas: 1
   service:
