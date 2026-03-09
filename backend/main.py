@@ -36,11 +36,15 @@ from deployment_actions import (
     restart_application, get_sync_status,
     DeployRequest, RollbackRequest, ScaleRequest, ActionResponse
 )
+import projects_api
 
 app = FastAPI(title="openluffy")
 
 # Include authentication routes
 app.include_router(auth_router)
+
+# Include project-scoped API routes (v1.2)
+app.include_router(projects_api.router)
 
 # Groups and Permissions routes
 app.add_api_route("/api/v1/groups", list_groups, methods=["GET"], tags=["groups"])
@@ -326,6 +330,9 @@ try:
     v1 = client.CoreV1Api()
     apps_v1 = client.AppsV1Api()
     k8s_available = True
+    
+    # Initialize K8s clients for projects_api
+    projects_api.init_k8s_clients(v1, apps_v1)
 except:
     k8s_available = False
     v1 = None
